@@ -465,6 +465,41 @@ export function applyCompactionDefaults(cfg: OpenClawConfig): OpenClawConfig {
   };
 }
 
+/**
+ * Cullmate local-first defaults.
+ * Applied as a base layer: user config values always win.
+ * Disables remote features (update checks, plugins, browser).
+ */
+export function applyCullmateDefaults(cfg: OpenClawConfig): OpenClawConfig {
+  let next = { ...cfg };
+
+  // Disable update checks unless explicitly configured
+  if (next.update?.checkOnStart === undefined) {
+    next = {
+      ...next,
+      update: { ...next.update, checkOnStart: false },
+    };
+  }
+
+  // Disable plugins (remote installs) unless explicitly configured
+  if (next.plugins?.enabled === undefined) {
+    next = {
+      ...next,
+      plugins: { ...next.plugins, enabled: false },
+    };
+  }
+
+  // Disable browser control unless explicitly configured
+  if (next.browser?.enabled === undefined) {
+    next = {
+      ...next,
+      browser: { ...next.browser, enabled: false },
+    };
+  }
+
+  return next;
+}
+
 export function resetSessionDefaultsWarningForTests() {
   defaultWarnState = { warned: false };
 }

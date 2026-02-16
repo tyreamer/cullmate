@@ -17,6 +17,7 @@ import { VERSION } from "../version.js";
 import { DuplicateAgentDirError, findDuplicateAgentDirs } from "./agent-dirs.js";
 import { rotateConfigBackups } from "./backup-rotation.js";
 import {
+  applyCullmateDefaults,
   applyCompactionDefaults,
   applyContextPruningDefaults,
   applyAgentDefaults,
@@ -539,7 +540,7 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
             timeoutMs: resolveShellEnvFallbackTimeoutMs(deps.env),
           });
         }
-        return {};
+        return applyCullmateDefaults({});
       }
       const raw = deps.fs.readFileSync(configPath, "utf-8");
       const parsed = deps.json5.parse(raw);
@@ -579,11 +580,13 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
         deps.logger.warn(`Config warnings:\\n${details}`);
       }
       warnIfConfigFromFuture(validated.config, deps.logger);
-      const cfg = applyModelDefaults(
-        applyCompactionDefaults(
-          applyContextPruningDefaults(
-            applyAgentDefaults(
-              applySessionDefaults(applyLoggingDefaults(applyMessageDefaults(validated.config))),
+      const cfg = applyCullmateDefaults(
+        applyModelDefaults(
+          applyCompactionDefaults(
+            applyContextPruningDefaults(
+              applyAgentDefaults(
+                applySessionDefaults(applyLoggingDefaults(applyMessageDefaults(validated.config))),
+              ),
             ),
           ),
         ),
@@ -631,11 +634,13 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
     const exists = deps.fs.existsSync(configPath);
     if (!exists) {
       const hash = hashConfigRaw(null);
-      const config = applyTalkApiKey(
-        applyModelDefaults(
-          applyCompactionDefaults(
-            applyContextPruningDefaults(
-              applyAgentDefaults(applySessionDefaults(applyMessageDefaults({}))),
+      const config = applyCullmateDefaults(
+        applyTalkApiKey(
+          applyModelDefaults(
+            applyCompactionDefaults(
+              applyContextPruningDefaults(
+                applyAgentDefaults(applySessionDefaults(applyMessageDefaults({}))),
+              ),
             ),
           ),
         ),
