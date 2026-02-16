@@ -1,3 +1,4 @@
+// TODO(rename): This file and its exports still use OpenClaw naming.
 import type { OpenClawConfig } from "../config/config.js";
 import type { GatewayMessageChannel } from "../utils/message-channel.js";
 import type { SandboxFsBridge } from "./sandbox/fs-bridge.js";

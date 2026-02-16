@@ -1,7 +1,8 @@
 import { createRequire } from "node:module";
 
+declare const __CULLMATE_VERSION__: string | undefined;
 declare const __OPENCLAW_VERSION__: string | undefined;
-const CORE_PACKAGE_NAME = "openclaw";
+const CORE_PACKAGE_NAME = "cullmate";
 
 const PACKAGE_JSON_CANDIDATES = [
   "../package.json",
@@ -61,11 +62,13 @@ export function resolveVersionFromModuleUrl(moduleUrl: string): string | null {
   );
 }
 
-// Single source of truth for the current OpenClaw version.
+// Single source of truth for the current Cullmate version.
 // - Embedded/bundled builds: injected define or env var.
 // - Dev/npm builds: package.json.
 export const VERSION =
+  (typeof __CULLMATE_VERSION__ === "string" && __CULLMATE_VERSION__) ||
   (typeof __OPENCLAW_VERSION__ === "string" && __OPENCLAW_VERSION__) ||
+  process.env.CULLMATE_BUNDLED_VERSION ||
   process.env.OPENCLAW_BUNDLED_VERSION ||
   resolveVersionFromModuleUrl(import.meta.url) ||
   "0.0.0";

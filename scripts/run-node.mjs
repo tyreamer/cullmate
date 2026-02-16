@@ -128,7 +128,7 @@ const hasSourceMtimeChanged = (stampMtime, deps) => {
 };
 
 const shouldBuild = (deps) => {
-  if (deps.env.OPENCLAW_FORCE_BUILD === "1") {
+  if (deps.env.CULLMATE_FORCE_BUILD === "1" || deps.env.OPENCLAW_FORCE_BUILD === "1") {
     return true;
   }
   const stamp = readBuildStamp(deps);
@@ -170,14 +170,14 @@ const shouldBuild = (deps) => {
 };
 
 const logRunner = (message, deps) => {
-  if (deps.env.OPENCLAW_RUNNER_LOG === "0") {
+  if (deps.env.CULLMATE_RUNNER_LOG === "0" || deps.env.OPENCLAW_RUNNER_LOG === "0") {
     return;
   }
-  deps.stderr.write(`[openclaw] ${message}\n`);
+  deps.stderr.write(`[cullmate] ${message}\n`);
 };
 
 const runOpenClaw = async (deps) => {
-  const nodeProcess = deps.spawn(deps.execPath, ["openclaw.mjs", ...deps.args], {
+  const nodeProcess = deps.spawn(deps.execPath, ["cullmate.mjs", ...deps.args], {
     cwd: deps.cwd,
     env: deps.env,
     stdio: "inherit",

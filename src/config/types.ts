@@ -1,3 +1,4 @@
+// TODO(rename): Internal types still use OpenClaw prefix (e.g. OpenClawConfig).
 // Split into focused modules to keep files small and improve edit locality.
 
 export * from "./types.agent-defaults.js";
