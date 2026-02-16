@@ -1,0 +1,15 @@
+{
+  "update": { "checkOnStart": false },
+  "plugins": { "enabled": false },
+  "browser": { "enabled": false },
+  "memory": { "enabled": false },
+  "gateway": {
+    "tailscale": { "enabled": false },
+    "http": {
+      "endpoints": {
+        "chatCompletions": { "enabled": false },
+        "responses": { "enabled": false }
+      }
+    }
+  }
+}
