@@ -2,7 +2,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-export const POSIX_OPENCLAW_TMP_DIR = "/tmp/openclaw";
+export const POSIX_OPENCLAW_TMP_DIR = "/tmp/cullmate";
+/** @deprecated Legacy path — checked as fallback. */
+export const POSIX_LEGACY_TMP_DIR = "/tmp/openclaw";
 
 type ResolvePreferredOpenClawTmpDirOptions = {
   accessSync?: (path: string, mode?: number) => void;
@@ -62,7 +64,7 @@ export function resolvePreferredOpenClawTmpDir(
 
   const fallback = (): string => {
     const base = tmpdir();
-    const suffix = uid === undefined ? "openclaw" : `openclaw-${uid}`;
+    const suffix = uid === undefined ? "cullmate" : `cullmate-${uid}`;
     return path.join(base, suffix);
   };
 

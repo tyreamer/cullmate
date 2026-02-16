@@ -10,9 +10,10 @@ import { type LogLevel, levelToMinLevel, normalizeLogLevel } from "./levels.js";
 import { loggingState } from "./state.js";
 
 export const DEFAULT_LOG_DIR = resolvePreferredOpenClawTmpDir();
-export const DEFAULT_LOG_FILE = path.join(DEFAULT_LOG_DIR, "openclaw.log"); // legacy single-file path
+export const DEFAULT_LOG_FILE = path.join(DEFAULT_LOG_DIR, "cullmate.log"); // legacy single-file path
 
-const LOG_PREFIX = "openclaw";
+const LOG_PREFIX = "cullmate";
+const LEGACY_LOG_PREFIX = "openclaw";
 const LOG_SUFFIX = ".log";
 const MAX_LOG_AGE_MS = 24 * 60 * 60 * 1000; // 24h
 
@@ -218,11 +219,15 @@ function defaultRollingPathForToday(): string {
 
 function isRollingPath(file: string): boolean {
   const base = path.basename(file);
-  return (
+  const matchesCurrent =
     base.startsWith(`${LOG_PREFIX}-`) &&
     base.endsWith(LOG_SUFFIX) &&
-    base.length === `${LOG_PREFIX}-YYYY-MM-DD${LOG_SUFFIX}`.length
-  );
+    base.length === `${LOG_PREFIX}-YYYY-MM-DD${LOG_SUFFIX}`.length;
+  const matchesLegacy =
+    base.startsWith(`${LEGACY_LOG_PREFIX}-`) &&
+    base.endsWith(LOG_SUFFIX) &&
+    base.length === `${LEGACY_LOG_PREFIX}-YYYY-MM-DD${LOG_SUFFIX}`.length;
+  return matchesCurrent || matchesLegacy;
 }
 
 function pruneOldRollingLogs(dir: string): void {
@@ -233,7 +238,9 @@ function pruneOldRollingLogs(dir: string): void {
       if (!entry.isFile()) {
         continue;
       }
-      if (!entry.name.startsWith(`${LOG_PREFIX}-`) || !entry.name.endsWith(LOG_SUFFIX)) {
+      const isCurrentPrefix = entry.name.startsWith(`${LOG_PREFIX}-`);
+      const isLegacyPrefix = entry.name.startsWith(`${LEGACY_LOG_PREFIX}-`);
+      if ((!isCurrentPrefix && !isLegacyPrefix) || !entry.name.endsWith(LOG_SUFFIX)) {
         continue;
       }
       const fullPath = path.join(dir, entry.name);
