@@ -40,6 +40,7 @@ import {
   saveExecApprovals,
   updateExecApprovalsFormValue,
 } from "./controllers/exec-approvals.ts";
+import { openPath } from "./controllers/ingest.ts";
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
@@ -51,8 +52,15 @@ import {
   updateSkillEdit,
   updateSkillEnabled,
 } from "./controllers/skills.ts";
-import { icons } from "./icons.ts";
-import { normalizeBasePath, TAB_GROUPS, subtitleForTab, titleForTab } from "./navigation.ts";
+import {
+  normalizeBasePath,
+  ADVANCED_TAB_GROUPS,
+  PRIMARY_TABS,
+  subtitleForTab,
+  titleForTab,
+  pathForTab,
+  type Tab,
+} from "./navigation.ts";
 import { renderAgents } from "./views/agents.ts";
 import { renderChannels } from "./views/channels.ts";
 import { renderChat } from "./views/chat.ts";
@@ -61,12 +69,33 @@ import { renderCron } from "./views/cron.ts";
 import { renderDebug } from "./views/debug.ts";
 import { renderExecApprovalPrompt } from "./views/exec-approval.ts";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation.ts";
+import { renderHome } from "./views/home.ts";
+import { renderIngestModal } from "./views/ingest.ts";
 import { renderInstances } from "./views/instances.ts";
 import { renderLogs } from "./views/logs.ts";
 import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
 import { renderSessions } from "./views/sessions.ts";
 import { renderSkills } from "./views/skills.ts";
+
+const ADVANCED_TABS = new Set<Tab>([
+  "overview",
+  "channels",
+  "instances",
+  "sessions",
+  "usage",
+  "cron",
+  "agents",
+  "skills",
+  "nodes",
+  "chat",
+  "debug",
+  "logs",
+]);
+
+function isAdvancedTab(tab: Tab): boolean {
+  return ADVANCED_TABS.has(tab);
+}
 
 const AVATAR_DATA_RE = /^data:/i;
 const AVATAR_HTTP_RE = /^https?:\/\//i;
@@ -107,96 +136,173 @@ export function renderApp(state: AppViewState) {
     null;
 
   return html`
-    <div class="shell ${isChat ? "shell--chat" : ""} ${chatFocus ? "shell--chat-focus" : ""} ${state.settings.navCollapsed ? "shell--nav-collapsed" : ""} ${state.onboarding ? "shell--onboarding" : ""}">
+    <div class="shell ${isChat ? "shell--chat" : ""} ${chatFocus ? "shell--chat-focus" : ""} ${state.settings.navCollapsed || !isAdvancedTab(state.tab) ? "shell--nav-collapsed" : ""} ${state.onboarding ? "shell--onboarding" : ""}">
       <header class="topbar">
         <div class="topbar-left">
-          <button
-            class="nav-collapse-toggle"
-            @click=${() =>
-              state.applySettings({
-                ...state.settings,
-                navCollapsed: !state.settings.navCollapsed,
-              })}
-            title="${state.settings.navCollapsed ? "Expand sidebar" : "Collapse sidebar"}"
-            aria-label="${state.settings.navCollapsed ? "Expand sidebar" : "Collapse sidebar"}"
-          >
-            <span class="nav-collapse-toggle__icon">${icons.menu}</span>
-          </button>
           <div class="brand">
             <div class="brand-logo">
               <img src=${basePath ? `${basePath}/favicon.svg` : "/favicon.svg"} alt="Cullmate" />
             </div>
             <div class="brand-text">
               <div class="brand-title">CULLMATE</div>
-              <div class="brand-sub">Gateway Dashboard</div>
             </div>
           </div>
+          <nav class="topnav" role="navigation" aria-label="Main">
+            ${PRIMARY_TABS.map(
+              (entry) => html`
+                <a
+                  href=${pathForTab(entry.tab as Tab, state.basePath)}
+                  class="topnav__link ${state.tab === entry.tab ? "active" : ""}"
+                  @click=${(e: MouseEvent) => {
+                    if (
+                      e.defaultPrevented ||
+                      e.button !== 0 ||
+                      e.metaKey ||
+                      e.ctrlKey ||
+                      e.shiftKey ||
+                      e.altKey
+                    ) {
+                      return;
+                    }
+                    e.preventDefault();
+                    state.setTab(entry.tab as Tab);
+                  }}
+                >${entry.label}</a>
+              `,
+            )}
+            <a
+              href=${pathForTab("overview" as Tab, state.basePath)}
+              class="topnav__link ${!["home", "config"].includes(state.tab) ? "active" : ""}"
+              @click=${(e: MouseEvent) => {
+                if (
+                  e.defaultPrevented ||
+                  e.button !== 0 ||
+                  e.metaKey ||
+                  e.ctrlKey ||
+                  e.shiftKey ||
+                  e.altKey
+                ) {
+                  return;
+                }
+                e.preventDefault();
+                state.setTab("overview" as Tab);
+              }}
+            >Advanced</a>
+          </nav>
         </div>
         <div class="topbar-status">
-          <div class="pill">
-            <span class="statusDot ${state.connected ? "ok" : ""}"></span>
-            <span>Health</span>
-            <span class="mono">${state.connected ? "OK" : "Offline"}</span>
-          </div>
+          <button
+            class="btn primary home-import-btn"
+            ?disabled=${!state.connected}
+            @click=${() => state.handleIngestOpen()}
+            title="Import photos from a source folder"
+          >Import Photos</button>
+          ${
+            isAdvancedTab(state.tab)
+              ? html`
+              <span class="topbar-health">
+                <span class="statusDot ${state.connected ? "ok" : ""}"></span>
+                <span class="topbar-health__label">${state.connected ? "Connected" : "Offline"}</span>
+              </span>
+            `
+              : state.connected
+                ? nothing
+                : html`
+                    <span class="topbar-health"><span class="statusDot"></span></span>
+                  `
+          }
           ${renderThemeToggle(state)}
         </div>
       </header>
-      <aside class="nav ${state.settings.navCollapsed ? "nav--collapsed" : ""}">
-        ${TAB_GROUPS.map((group) => {
-          const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? false;
-          const hasActiveTab = group.tabs.some((tab) => tab === state.tab);
-          return html`
-            <div class="nav-group ${isGroupCollapsed && !hasActiveTab ? "nav-group--collapsed" : ""}">
-              <button
-                class="nav-label"
-                @click=${() => {
-                  const next = { ...state.settings.navGroupsCollapsed };
-                  next[group.label] = !isGroupCollapsed;
-                  state.applySettings({
-                    ...state.settings,
-                    navGroupsCollapsed: next,
-                  });
-                }}
-                aria-expanded=${!isGroupCollapsed}
-              >
-                <span class="nav-label__text">${group.label}</span>
-                <span class="nav-label__chevron">${isGroupCollapsed ? "+" : "−"}</span>
-              </button>
-              <div class="nav-group__items">
-                ${group.tabs.map((tab) => renderTab(state, tab))}
-              </div>
-            </div>
-          `;
-        })}
-        <div class="nav-group nav-group--links">
-          <div class="nav-label nav-label--static">
-            <span class="nav-label__text">Resources</span>
-          </div>
-          <div class="nav-group__items">
-            <a
-              class="nav-item nav-item--external"
-              href="https://docs.openclaw.ai"
-              target="_blank"
-              rel="noreferrer"
-              title="Docs (opens in new tab)"
+      ${
+        isAdvancedTab(state.tab)
+          ? html`
+          <aside class="nav ${state.settings.navCollapsed ? "nav--collapsed" : ""}">
+            <button
+              class="nav-back-btn"
+              @click=${(e: MouseEvent) => {
+                e.preventDefault();
+                state.setTab("home" as Tab);
+              }}
             >
-              <span class="nav-item__icon" aria-hidden="true">${icons.book}</span>
-              <span class="nav-item__text">Docs</span>
-            </a>
-          </div>
-        </div>
-      </aside>
-      <main class="content ${isChat ? "content--chat" : ""}">
-        <section class="content-header">
-          <div>
-            ${state.tab === "usage" ? nothing : html`<div class="page-title">${titleForTab(state.tab)}</div>`}
-            ${state.tab === "usage" ? nothing : html`<div class="page-sub">${subtitleForTab(state.tab)}</div>`}
-          </div>
-          <div class="page-meta">
-            ${state.lastError ? html`<div class="pill danger">${state.lastError}</div>` : nothing}
-            ${isChat ? renderChatControls(state) : nothing}
-          </div>
-        </section>
+              <span class="nav-back-btn__arrow">&larr;</span>
+              <span>Back to Home</span>
+            </button>
+            ${ADVANCED_TAB_GROUPS.map((group) => {
+              const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? false;
+              const hasActiveTab = group.tabs.some((tab) => tab === state.tab);
+              return html`
+                <div class="nav-group ${isGroupCollapsed && !hasActiveTab ? "nav-group--collapsed" : ""}">
+                  <button
+                    class="nav-label"
+                    @click=${() => {
+                      const next = { ...state.settings.navGroupsCollapsed };
+                      next[group.label] = !isGroupCollapsed;
+                      state.applySettings({
+                        ...state.settings,
+                        navGroupsCollapsed: next,
+                      });
+                    }}
+                    aria-expanded=${!isGroupCollapsed}
+                  >
+                    <span class="nav-label__text">${group.label}</span>
+                    <span class="nav-label__chevron">${isGroupCollapsed ? "+" : "−"}</span>
+                  </button>
+                  <div class="nav-group__items">
+                    ${group.tabs.map((tab) => renderTab(state, tab))}
+                  </div>
+                </div>
+              `;
+            })}
+          </aside>
+        `
+          : nothing
+      }
+      <main class="content ${isChat ? "content--chat" : ""} ${state.tab === "home" ? "content--home" : ""}">
+        ${
+          state.tab !== "home"
+            ? html`
+            <section class="content-header">
+              <div>
+                ${state.tab === "usage" ? nothing : html`<div class="page-title">${titleForTab(state.tab)}</div>`}
+                ${state.tab === "usage" ? nothing : html`<div class="page-sub">${subtitleForTab(state.tab)}</div>`}
+              </div>
+              <div class="page-meta">
+                ${state.lastError ? html`<div class="pill danger">${state.lastError}</div>` : nothing}
+                ${isChat ? renderChatControls(state) : nothing}
+              </div>
+            </section>
+          `
+            : nothing
+        }
+
+        ${
+          state.tab === "home"
+            ? renderHome({
+                connected: state.connected,
+                suggestedSources: state.ingestSuggestedSources,
+                recentProjects: state.ingestRecentProjects,
+                onImportClick: () => state.handleIngestOpen(),
+                onSelectSuggestedSource: (s) => state.handleIngestSelectSuggestedSource(s),
+                onSelectRecent: (p) => {
+                  state.ingestSourcePath = p.sourcePath;
+                  state.ingestDestPath = p.destPath;
+                  state.ingestProjectName = p.projectName;
+                  state.handleIngestOpen();
+                },
+                onOpenReport: (p) => {
+                  if (p.reportPath && state.client) {
+                    void openPath(state.client, p.reportPath, p.projectRoot, false).catch(() => {});
+                  }
+                },
+                onRevealProject: (p) => {
+                  if (state.client) {
+                    void openPath(state.client, p.projectRoot, p.destPath, true).catch(() => {});
+                  }
+                },
+              })
+            : nothing
+        }
 
         ${
           state.tab === "overview"
@@ -947,6 +1053,35 @@ export function renderApp(state: AppViewState) {
       </main>
       ${renderExecApprovalPrompt(state)}
       ${renderGatewayUrlConfirmation(state)}
+      ${renderIngestModal({
+        stage: state.ingestStage,
+        sourcePath: state.ingestSourcePath,
+        destPath: state.ingestDestPath,
+        projectName: state.ingestProjectName,
+        verifyMode: state.ingestVerifyMode,
+        progress: state.ingestProgress,
+        result: state.ingestResult,
+        error: state.ingestError,
+        connected: state.connected,
+        recentProjects: state.ingestRecentProjects,
+        suggestedSources: state.ingestSuggestedSources,
+        onSourcePathChange: (v) => state.handleIngestSourcePathChange(v),
+        onDestPathChange: (v) => (state.ingestDestPath = v),
+        onProjectNameChange: (v) => (state.ingestProjectName = v),
+        onVerifyModeChange: (v) => (state.ingestVerifyMode = v),
+        onSelectRecent: (p) => {
+          state.ingestSourcePath = p.sourcePath;
+          state.ingestDestPath = p.destPath;
+          state.ingestProjectName = p.projectName;
+        },
+        onPickSource: () => void state.handleIngestPickSource(),
+        onPickDest: () => void state.handleIngestPickDest(),
+        onSelectSuggestedSource: (s) => state.handleIngestSelectSuggestedSource(s),
+        onStart: () => void state.handleIngestStart(),
+        onClose: () => state.handleIngestClose(),
+        onOpenReport: () => void state.handleIngestOpenReport(),
+        onRevealProject: () => void state.handleIngestRevealProject(),
+      })}
     </div>
   `;
 }

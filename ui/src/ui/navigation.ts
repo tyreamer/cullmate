@@ -1,6 +1,13 @@
 import type { IconName } from "./icons.js";
 
-export const TAB_GROUPS = [
+/** Primary nav: shown in the minimal Cullmate shell. */
+export const PRIMARY_TABS = [
+  { label: "Home", tab: "home" },
+  { label: "Settings", tab: "config" },
+] as const;
+
+/** Advanced nav: old dashboard tabs, accessible from "Advanced". */
+export const ADVANCED_TAB_GROUPS = [
   { label: "Chat", tabs: ["chat"] },
   {
     label: "Control",
@@ -10,7 +17,14 @@ export const TAB_GROUPS = [
   { label: "Settings", tabs: ["config", "debug", "logs"] },
 ] as const;
 
+/**
+ * @deprecated kept for backward compatibility with internal references.
+ * New code should use PRIMARY_TABS + ADVANCED_TAB_GROUPS.
+ */
+export const TAB_GROUPS = ADVANCED_TAB_GROUPS;
+
 export type Tab =
+  | "home"
   | "agents"
   | "overview"
   | "channels"
@@ -26,6 +40,7 @@ export type Tab =
   | "logs";
 
 const TAB_PATHS: Record<Tab, string> = {
+  home: "/",
   agents: "/agents",
   overview: "/overview",
   channels: "/channels",
@@ -41,7 +56,11 @@ const TAB_PATHS: Record<Tab, string> = {
   logs: "/logs",
 };
 
-const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab]));
+const PATH_TO_TAB = new Map(
+  Object.entries(TAB_PATHS)
+    .filter(([tab]) => tab !== "home") // "/" handled explicitly
+    .map(([tab, path]) => [path, tab as Tab]),
+);
 
 export function normalizeBasePath(basePath: string): string {
   if (!basePath) {
@@ -95,7 +114,7 @@ export function tabFromPath(pathname: string, basePath = ""): Tab | null {
     normalized = "/";
   }
   if (normalized === "/") {
-    return "chat";
+    return "home";
   }
   return PATH_TO_TAB.get(normalized) ?? null;
 }
@@ -124,6 +143,8 @@ export function inferBasePathFromPathname(pathname: string): string {
 
 export function iconForTab(tab: Tab): IconName {
   switch (tab) {
+    case "home":
+      return "image";
     case "agents":
       return "folder";
     case "chat":
@@ -157,6 +178,8 @@ export function iconForTab(tab: Tab): IconName {
 
 export function titleForTab(tab: Tab) {
   switch (tab) {
+    case "home":
+      return "Home";
     case "agents":
       return "Agents";
     case "overview":
@@ -190,6 +213,8 @@ export function titleForTab(tab: Tab) {
 
 export function subtitleForTab(tab: Tab) {
   switch (tab) {
+    case "home":
+      return "";
     case "agents":
       return "Manage agent workspaces, tools, and identities.";
     case "overview":
