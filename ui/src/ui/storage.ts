@@ -13,6 +13,9 @@ export type UiSettings = {
   splitRatio: number; // Sidebar split ratio (0.4 to 0.7, default 0.6)
   navCollapsed: boolean; // Collapsible sidebar state
   navGroupsCollapsed: Record<string, boolean>; // Which nav groups are collapsed
+  developerMode: boolean;
+  defaultSaveLocation: string;
+  defaultVerifyMode: "none" | "sentinel";
 };
 
 export function loadSettings(): UiSettings {
@@ -32,6 +35,9 @@ export function loadSettings(): UiSettings {
     splitRatio: 0.6,
     navCollapsed: false,
     navGroupsCollapsed: {},
+    developerMode: false,
+    defaultSaveLocation: "~/Pictures/Cullmate",
+    defaultVerifyMode: "none",
   };
 
   try {
@@ -77,6 +83,16 @@ export function loadSettings(): UiSettings {
         typeof parsed.navGroupsCollapsed === "object" && parsed.navGroupsCollapsed !== null
           ? parsed.navGroupsCollapsed
           : defaults.navGroupsCollapsed,
+      developerMode:
+        typeof parsed.developerMode === "boolean" ? parsed.developerMode : defaults.developerMode,
+      defaultSaveLocation:
+        typeof parsed.defaultSaveLocation === "string" && parsed.defaultSaveLocation.trim()
+          ? parsed.defaultSaveLocation.trim()
+          : defaults.defaultSaveLocation,
+      defaultVerifyMode:
+        parsed.defaultVerifyMode === "none" || parsed.defaultVerifyMode === "sentinel"
+          ? parsed.defaultVerifyMode
+          : defaults.defaultVerifyMode,
     };
   } catch {
     return defaults;

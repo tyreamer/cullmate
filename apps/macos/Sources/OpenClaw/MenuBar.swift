@@ -6,6 +6,7 @@ import Observation
 import OSLog
 import Security
 import SwiftUI
+import UserNotifications
 
 @main
 struct OpenClawApp: App {
@@ -251,7 +252,7 @@ private final class StatusItemMouseHandlerView: NSView {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private var state: AppState?
     private let webChatAutoLogger = Logger(subsystem: "ai.openclaw", category: "Chat")
     let updaterController: UpdaterProviding = makeUpdaterController()
@@ -282,6 +283,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ExecApprovalsGatewayPrompter.shared.start()
         MacNodeModeCoordinator.shared.start()
         VoiceWakeGlobalSettingsSync.shared.start()
+        UNUserNotificationCenter.current().delegate = self
+        VolumeWatcher.shared.start()
         Task { PresenceReporter.shared.start() }
         Task { await HealthStore.shared.refresh(onDemand: true) }
         Task { await PortGuardian.shared.sweep(mode: AppStateStore.shared.connectionMode) }
@@ -302,6 +305,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        VolumeWatcher.shared.stop()
         PresenceReporter.shared.stop()
         NodePairingApprovalPrompter.shared.stop()
         DevicePairingApprovalPrompter.shared.stop()
@@ -315,6 +319,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { await RemoteTunnelManager.shared.stopAll() }
         Task { await GatewayConnection.shared.shutdown() }
         Task { await PeekabooBridgeHostCoordinator.shared.stop() }
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = response.notification.request.content.userInfo
+        let category = response.notification.request.content.categoryIdentifier
+
+        if category == VolumeWatcher.notificationCategory {
+            if let sourcePath = userInfo["sourcePath"] as? String {
+                Task { @MainActor in
+                    VolumeWatcher.shared.handleNotificationAction(sourcePath: sourcePath)
+                }
+            }
+        }
+        completionHandler()
     }
 
     @MainActor

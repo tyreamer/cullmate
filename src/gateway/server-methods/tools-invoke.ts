@@ -36,8 +36,12 @@ export const toolsInvokeHandlers: GatewayRequestHandlers = {
     });
 
     try {
+      const runId = `rpc-${Date.now()}`;
+      const onUpdate = (update: unknown) => {
+        context.broadcast("chat", { type: "tool_update", tool: name, runId, update });
+      };
       // oxlint-disable-next-line typescript/no-explicit-any
-      const result = await (tool as any).execute?.(`rpc-${Date.now()}`, args);
+      const result = await (tool as any).execute?.(runId, args, undefined, onUpdate);
 
       context.broadcast("chat", {
         type: "tool_status",

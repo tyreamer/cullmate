@@ -11,6 +11,7 @@ import { createCanvasTool } from "./tools/canvas-tool.js";
 import { createCronTool } from "./tools/cron-tool.js";
 import { createGatewayTool } from "./tools/gateway-tool.js";
 import { createImageTool } from "./tools/image-tool.js";
+import { createIngestVerifyTool } from "./tools/ingest-verify-tool.js";
 import { createMessageTool } from "./tools/message-tool.js";
 import { createNodesTool } from "./tools/nodes-tool.js";
 import { createPingTool } from "./tools/ping-tool.js";
@@ -101,6 +102,7 @@ export function createOpenClawTools(options?: {
       });
   const tools: AnyAgentTool[] = [
     createPingTool(),
+    createIngestVerifyTool(),
     createBrowserTool({
       sandboxBridgeUrl: options?.sandboxBrowserBridgeUrl,
       allowHostControl: options?.allowHostBrowserControl,

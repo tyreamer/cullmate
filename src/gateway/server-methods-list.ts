@@ -91,6 +91,8 @@ const BASE_METHODS = [
   "chat.abort",
   "chat.send",
   "tools.invoke",
+  "system.pick_folder",
+  "system.list_volumes",
 ];
 
 export function listGatewayMethods(): string[] {

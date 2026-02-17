@@ -79,6 +79,9 @@ importers:
       ajv:
         specifier: ^8.18.0
         version: 8.18.0
+      blake3:
+        specifier: 2.1.7
+        version: 2.1.7
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
@@ -247,13 +250,13 @@ importers:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/copilot-proxy:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/diagnostics-otel:
     dependencies:
@@ -293,13 +296,13 @@ importers:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/discord:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/feishu:
     dependencies:
@@ -315,19 +318,19 @@ importers:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/google-antigravity-auth:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/google-gemini-cli-auth:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/googlechat:
     dependencies:
@@ -337,37 +340,37 @@ importers:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/imessage:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/irc:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/line:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/llm-task:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/lobster:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/matrix:
     dependencies:
@@ -389,19 +392,19 @@ importers:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/mattermost:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/memory-core:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/memory-lancedb:
     dependencies:
@@ -417,13 +420,13 @@ importers:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/minimax-portal-auth:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/msteams:
     dependencies:
@@ -442,13 +445,13 @@ importers:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/nextcloud-talk:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/nostr:
     dependencies:
@@ -461,31 +464,31 @@ importers:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/open-prose:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/signal:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/slack:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/telegram:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/tlon:
     dependencies:
@@ -495,7 +498,7 @@ importers:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/twitch:
     dependencies:
@@ -514,7 +517,7 @@ importers:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/voice-call:
     dependencies:
@@ -530,13 +533,13 @@ importers:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/whatsapp:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/zalo:
     dependencies:
@@ -546,7 +549,7 @@ importers:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   extensions/zalouser:
     dependencies:
@@ -556,17 +559,23 @@ importers:
     devDependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../../packages/openclaw
 
   packages/clawdbot:
     dependencies:
       openclaw:
         specifier: workspace:*
-        version: link:../..
+        version: link:../openclaw
 
   packages/moltbot:
     dependencies:
       openclaw:
+        specifier: workspace:*
+        version: link:../openclaw
+
+  packages/openclaw:
+    dependencies:
+      cullmate:
         specifier: workspace:*
         version: link:../..
 
@@ -3309,6 +3318,9 @@ packages:
 
   birpc@4.0.0:
     resolution: {integrity: sha512-LShSxJP0KTmd101b6DRyGBj57LZxSDYWKitQNW/mi8GRMvZb078Uf9+pveax1DrVL89vm7mWe+TovdI/UDOuPw==}
+
+  blake3@2.1.7:
+    resolution: {integrity: sha512-5d+TdKJvju96IyEaGJ0eO6CHbckWi+NBrCezGYM/WsnI3R03aLL2TWfsuZSh1rs0fTv/L3ps/r0vykjYurcIwA==}
 
   bluebird@3.7.2:
     resolution: {integrity: sha512-XpNj6GDQzdfW+r2Wnn7xiSAd7TM3jzkxGXBGTtWKuSXv1xUV+azxAm8jdWZN06QTQk+2N2XB9jRDkvbmQmcRtg==}
@@ -6764,7 +6776,7 @@ snapshots:
 
   '@larksuiteoapi/node-sdk@1.59.0':
     dependencies:
-      axios: 1.13.5
+      axios: 1.13.5(debug@4.4.3)
       lodash.identity: 3.0.0
       lodash.merge: 4.6.2
       lodash.pickby: 4.6.0
@@ -6780,7 +6792,7 @@ snapshots:
     dependencies:
       '@types/node': 24.10.13
     optionalDependencies:
-      axios: 1.13.5
+      axios: 1.13.5(debug@4.4.3)
     transitivePeerDependencies:
       - debug
 
@@ -6983,7 +6995,7 @@ snapshots:
       '@azure/core-auth': 1.10.1
       '@azure/msal-node': 3.8.7
       '@microsoft/agents-activity': 1.2.3
-      axios: 1.13.5
+      axios: 1.13.5(debug@4.4.3)
       jsonwebtoken: 9.0.3
       jwks-rsa: 3.2.2
       object-path: 0.11.8
@@ -7882,7 +7894,7 @@ snapshots:
       '@slack/types': 2.20.0
       '@slack/web-api': 7.14.1
       '@types/express': 5.0.6
-      axios: 1.13.5
+      axios: 1.13.5(debug@4.4.3)
       express: 5.2.1
       path-to-regexp: 8.3.0
       raw-body: 3.0.2
@@ -7928,7 +7940,7 @@ snapshots:
       '@slack/types': 2.20.0
       '@types/node': 25.2.3
       '@types/retry': 0.12.0
-      axios: 1.13.5
+      axios: 1.13.5(debug@4.4.3)
       eventemitter3: 5.0.4
       form-data: 2.5.4
       is-electron: 2.2.2
@@ -8816,14 +8828,6 @@ snapshots:
 
   aws4@1.13.2: {}
 
-  axios@1.13.5:
-    dependencies:
-      follow-redirects: 1.15.11
-      form-data: 2.5.4
-      proxy-from-env: 1.1.0
-    transitivePeerDependencies:
-      - debug
-
   axios@1.13.5(debug@4.4.3):
     dependencies:
       follow-redirects: 1.15.11(debug@4.4.3)
@@ -8855,6 +8859,8 @@ snapshots:
   bignumber.js@9.3.1: {}
 
   birpc@4.0.0: {}
+
+  blake3@2.1.7: {}
 
   bluebird@3.7.2: {}
 
@@ -9402,8 +9408,6 @@ snapshots:
       array-back: 3.1.0
 
   flatbuffers@24.12.23: {}
-
-  follow-redirects@1.15.11: {}
 
   follow-redirects@1.15.11(debug@4.4.3):
     optionalDependencies:

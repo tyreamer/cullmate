@@ -1,0 +1,19 @@
+{
+  "name": "openclaw",
+  "version": "2026.2.16",
+  "description": "Compatibility shim that forwards to cullmate",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./plugin-sdk": {
+      "default": "./plugin-sdk.js"
+    },
+    "./plugin-sdk/account-id": {
+      "default": "./plugin-sdk-account-id.js"
+    },
+    "./cli-entry": "./cli-entry.js"
+  },
+  "dependencies": {
+    "cullmate": "workspace:*"
+  }
+}

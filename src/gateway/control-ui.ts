@@ -23,6 +23,7 @@ export type ControlUiRequestOptions = {
   config?: OpenClawConfig;
   agentId?: string;
   root?: ControlUiRootState;
+  authToken?: string;
 };
 
 export type ControlUiRootState =
@@ -166,10 +167,17 @@ function serveFile(res: ServerResponse, filePath: string) {
   res.end(fs.readFileSync(filePath));
 }
 
-function serveIndexHtml(res: ServerResponse, indexPath: string) {
+function serveIndexHtml(res: ServerResponse, indexPath: string, opts?: { authToken?: string }) {
+  let html = fs.readFileSync(indexPath, "utf8");
+  if (opts?.authToken) {
+    // Use a <meta> tag instead of inline <script> to comply with CSP script-src 'self'.
+    const escaped = opts.authToken.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+    const inject = `<meta name="cullmate-auth-token" content="${escaped}">`;
+    html = html.replace("</head>", `${inject}\n</head>`);
+  }
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache");
-  res.end(fs.readFileSync(indexPath, "utf8"));
+  res.end(html);
 }
 
 function isSafeRelativePath(relPath: string) {
@@ -254,6 +262,7 @@ export function handleControlUiHttpRequest(
       assistantName: identity.name,
       assistantAvatar: avatarValue ?? identity.avatar,
       assistantAgentId: identity.agentId,
+      ...(opts?.authToken ? { authToken: opts.authToken } : {}),
     } satisfies ControlUiBootstrapConfig);
     return true;
   }
@@ -320,7 +329,7 @@ export function handleControlUiHttpRequest(
 
   if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
     if (path.basename(filePath) === "index.html") {
-      serveIndexHtml(res, filePath);
+      serveIndexHtml(res, filePath, { authToken: opts?.authToken });
       return true;
     }
     serveFile(res, filePath);
@@ -330,7 +339,7 @@ export function handleControlUiHttpRequest(
   // SPA fallback (client-side router): serve index.html for unknown paths.
   const indexPath = path.join(root, "index.html");
   if (fs.existsSync(indexPath)) {
-    serveIndexHtml(res, indexPath);
+    serveIndexHtml(res, indexPath, { authToken: opts?.authToken });
     return true;
   }
 

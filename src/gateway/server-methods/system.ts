@@ -1,3 +1,6 @@
+import { execFile } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import type { GatewayRequestHandlers } from "./types.js";
 import { resolveMainSessionKeyFromConfig } from "../../config/sessions.js";
 import { getLastHeartbeatEvent } from "../../infra/heartbeat-events.js";
@@ -136,5 +139,162 @@ export const systemHandlers: GatewayRequestHandlers = {
       },
     );
     respond(true, { ok: true }, undefined);
+  },
+  "system.open_path": ({ params, respond }) => {
+    const filePath = typeof params.path === "string" ? params.path.trim() : "";
+    if (!filePath) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "system.open_path requires params.path"),
+      );
+      return;
+    }
+    // Only allow on macOS
+    if (process.platform !== "darwin") {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, "open_path only supported on macOS"),
+      );
+      return;
+    }
+    // Validate path is within allowed_root to prevent traversal
+    const allowedRoot = typeof params.allowed_root === "string" ? params.allowed_root.trim() : "";
+    if (!allowedRoot) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "system.open_path requires params.allowed_root"),
+      );
+      return;
+    }
+    const resolvedPath = path.resolve(filePath);
+    const resolvedRoot = path.resolve(allowedRoot);
+    if (!resolvedPath.startsWith(resolvedRoot + path.sep) && resolvedPath !== resolvedRoot) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "path is outside allowed root"),
+      );
+      return;
+    }
+    const reveal = typeof params.reveal === "boolean" ? params.reveal : false;
+    const args = reveal ? ["-R", resolvedPath] : [resolvedPath];
+    execFile("/usr/bin/open", args, (err) => {
+      if (err) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.UNAVAILABLE, `open failed: ${err.message}`),
+        );
+      } else {
+        respond(true, { ok: true }, undefined);
+      }
+    });
+  },
+  "system.pick_folder": ({ params, respond }) => {
+    if (process.platform !== "darwin") {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, "pick_folder only supported on macOS"),
+      );
+      return;
+    }
+    const prompt = typeof params.prompt === "string" ? params.prompt.trim() : "Choose a folder";
+    const defaultLocation =
+      typeof params.default_location === "string" ? params.default_location.trim() : "";
+    // Use osascript to show a native folder picker dialog
+    const scriptParts = ["choose folder with prompt " + JSON.stringify(prompt)];
+    if (defaultLocation) {
+      scriptParts.push("default location POSIX file " + JSON.stringify(defaultLocation));
+    }
+    const script = scriptParts.join(" ");
+    execFile("/usr/bin/osascript", ["-e", script], (err, stdout) => {
+      if (err) {
+        // osascript returns exit code 1 when user cancels the dialog
+        const msg = err.message ?? "";
+        if (msg.includes("User canceled") || msg.includes("(-128)")) {
+          respond(true, { ok: false, cancelled: true }, undefined);
+          return;
+        }
+        respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, `pick_folder failed: ${msg}`));
+        return;
+      }
+      // osascript returns an HFS path like "Macintosh HD:Volumes:SD_CARD:DCIM:"
+      // Convert to POSIX using osascript
+      const hfsPath = stdout.trim();
+      if (!hfsPath) {
+        respond(true, { ok: false, cancelled: true }, undefined);
+        return;
+      }
+      const posixScript = `POSIX path of (${JSON.stringify(hfsPath)} as alias)`;
+      execFile("/usr/bin/osascript", ["-e", posixScript], (posixErr, posixStdout) => {
+        if (posixErr) {
+          respond(
+            false,
+            undefined,
+            errorShape(ErrorCodes.UNAVAILABLE, `path conversion failed: ${posixErr.message}`),
+          );
+          return;
+        }
+        const posixPath = posixStdout.trim();
+        // Remove trailing slash for consistency (unless it's the root "/")
+        const normalized =
+          posixPath.length > 1 && posixPath.endsWith("/") ? posixPath.slice(0, -1) : posixPath;
+        respond(true, { ok: true, path: normalized }, undefined);
+      });
+    });
+  },
+  "system.list_volumes": ({ respond }) => {
+    if (process.platform !== "darwin") {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, "list_volumes only supported on macOS"),
+      );
+      return;
+    }
+    const volumesDir = "/Volumes";
+    let entries: string[];
+    try {
+      entries = fs.readdirSync(volumesDir);
+    } catch {
+      respond(true, { volumes: [], suggestedSources: [] }, undefined);
+      return;
+    }
+    const volumes: Array<{ name: string; path: string }> = [];
+    const suggestedSources: Array<{ label: string; path: string }> = [];
+    for (const name of entries) {
+      const volPath = path.join(volumesDir, name);
+      try {
+        const stat = fs.statSync(volPath);
+        if (!stat.isDirectory()) {
+          continue;
+        }
+      } catch {
+        continue;
+      }
+      volumes.push({ name, path: volPath });
+      // Detect camera card patterns
+      const dcimPath = path.join(volPath, "DCIM");
+      try {
+        if (fs.statSync(dcimPath).isDirectory()) {
+          suggestedSources.push({ label: `${name} (DCIM)`, path: dcimPath });
+        }
+      } catch {
+        // No DCIM — check for PRIVATE/MISC pattern (Sony, Panasonic, etc.)
+        try {
+          const hasPrivate = fs.statSync(path.join(volPath, "PRIVATE")).isDirectory();
+          if (hasPrivate) {
+            suggestedSources.push({ label: name, path: volPath });
+          }
+        } catch {
+          // Not a camera card
+        }
+      }
+    }
+    respond(true, { volumes, suggestedSources }, undefined);
   },
 };

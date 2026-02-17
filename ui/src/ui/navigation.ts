@@ -3,7 +3,8 @@ import type { IconName } from "./icons.js";
 /** Primary nav: shown in the minimal Cullmate shell. */
 export const PRIMARY_TABS = [
   { label: "Home", tab: "home" },
-  { label: "Settings", tab: "config" },
+  { label: "Projects", tab: "projects" },
+  { label: "Settings", tab: "settings" },
 ] as const;
 
 /** Advanced nav: old dashboard tabs, accessible from "Advanced". */
@@ -25,6 +26,8 @@ export const TAB_GROUPS = ADVANCED_TAB_GROUPS;
 
 export type Tab =
   | "home"
+  | "projects"
+  | "settings"
   | "agents"
   | "overview"
   | "channels"
@@ -41,6 +44,8 @@ export type Tab =
 
 const TAB_PATHS: Record<Tab, string> = {
   home: "/",
+  projects: "/projects",
+  settings: "/settings",
   agents: "/agents",
   overview: "/overview",
   channels: "/channels",
@@ -145,6 +150,10 @@ export function iconForTab(tab: Tab): IconName {
   switch (tab) {
     case "home":
       return "image";
+    case "projects":
+      return "folder";
+    case "settings":
+      return "settings";
     case "agents":
       return "folder";
     case "chat":
@@ -180,6 +189,10 @@ export function titleForTab(tab: Tab) {
   switch (tab) {
     case "home":
       return "Home";
+    case "projects":
+      return "Projects";
+    case "settings":
+      return "Settings";
     case "agents":
       return "Agents";
     case "overview":
@@ -215,6 +228,10 @@ export function subtitleForTab(tab: Tab) {
   switch (tab) {
     case "home":
       return "";
+    case "projects":
+      return "All your imported shoots in one place.";
+    case "settings":
+      return "Preferences and advanced options.";
     case "agents":
       return "Manage agent workspaces, tools, and identities.";
     case "overview":

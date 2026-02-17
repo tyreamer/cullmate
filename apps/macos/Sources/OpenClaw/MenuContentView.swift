@@ -40,78 +40,29 @@ struct MenuContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Toggle(isOn: self.activeBinding) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(self.connectionLabel)
-                    self.statusLine(label: self.healthStatus.label, color: self.healthStatus.color)
-                    if self.pairingPrompter.pendingCount > 0 {
-                        let repairCount = self.pairingPrompter.pendingRepairCount
-                        let repairSuffix = repairCount > 0 ? " · \(repairCount) repair" : ""
-                        self.statusLine(
-                            label: "Pairing approval pending (\(self.pairingPrompter.pendingCount))\(repairSuffix)",
-                            color: .orange)
-                    }
-                    if self.devicePairingPrompter.pendingCount > 0 {
-                        let repairCount = self.devicePairingPrompter.pendingRepairCount
-                        let repairSuffix = repairCount > 0 ? " · \(repairCount) repair" : ""
-                        self.statusLine(
-                            label: "Device pairing pending (\(self.devicePairingPrompter.pendingCount))\(repairSuffix)",
-                            color: .orange)
-                    }
-                }
+            // Status header
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Cullmate")
+                    .font(.headline)
+                self.statusLine(label: self.gatewayStatusLabel, color: self.gatewayStatusColor)
             }
-            .disabled(self.state.connectionMode == .unconfigured)
 
             Divider()
-            Toggle(isOn: self.heartbeatsBinding) {
-                HStack(spacing: 8) {
-                    Label("Send Heartbeats", systemImage: "waveform.path.ecg")
-                    Spacer(minLength: 0)
-                    self.statusLine(label: self.heartbeatStatus.label, color: self.heartbeatStatus.color)
-                }
-            }
-            Toggle(
-                isOn: Binding(
-                    get: { self.browserControlEnabled },
-                    set: { enabled in
-                        self.browserControlEnabled = enabled
-                        Task { await self.saveBrowserControlEnabled(enabled) }
-                    })) {
-                Label("Browser Control", systemImage: "globe")
-            }
-            Toggle(isOn: self.$cameraEnabled) {
-                Label("Allow Camera", systemImage: "camera")
-            }
-            Picker(selection: self.execApprovalModeBinding) {
-                ForEach(ExecApprovalQuickMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
+
+            // Primary actions
+            Button {
+                Task { @MainActor in
+                    await self.openDashboardWithModal(modal: "ingest")
                 }
             } label: {
-                Label("Exec Approvals", systemImage: "terminal")
+                Label("Ingest & Verify\u{2026}", systemImage: "sdcard")
             }
-            Toggle(isOn: Binding(get: { self.state.canvasEnabled }, set: { self.state.canvasEnabled = $0 })) {
-                Label("Allow Canvas", systemImage: "rectangle.and.pencil.and.ellipsis")
-            }
-            .onChange(of: self.state.canvasEnabled) { _, enabled in
-                if !enabled {
-                    CanvasManager.shared.hideAll()
-                }
-            }
-            Toggle(isOn: self.voiceWakeBinding) {
-                Label("Voice Wake", systemImage: "mic.fill")
-            }
-            .disabled(!voiceWakeSupported)
-            .opacity(voiceWakeSupported ? 1 : 0.5)
-            if self.showVoiceWakeMicPicker {
-                self.voiceWakeMicMenu
-            }
-            Divider()
             Button {
                 Task { @MainActor in
                     await self.openDashboard()
                 }
             } label: {
-                Label("Open Dashboard", systemImage: "gauge")
+                Label("Open Cullmate", systemImage: "gauge")
             }
             Button {
                 Task { @MainActor in
@@ -121,35 +72,28 @@ struct MenuContent: View {
             } label: {
                 Label("Open Chat", systemImage: "bubble.left.and.bubble.right")
             }
-            if self.state.canvasEnabled {
+
+            Divider()
+
+            // Gateway lifecycle
+            if self.isGatewayRunning {
                 Button {
-                    Task { @MainActor in
-                        if self.state.canvasPanelVisible {
-                            CanvasManager.shared.hideAll()
-                        } else {
-                            let sessionKey = await GatewayConnection.shared.mainSessionKey()
-                            // Don't force a navigation on re-open: preserve the current web view state.
-                            _ = try? CanvasManager.shared.show(sessionKey: sessionKey, path: nil)
-                        }
-                    }
+                    self.state.isPaused = true
                 } label: {
-                    Label(
-                        self.state.canvasPanelVisible ? "Close Canvas" : "Open Canvas",
-                        systemImage: "rectangle.inset.filled.on.rectangle")
+                    Label("Stop Gateway", systemImage: "stop.circle")
+                }
+            } else {
+                Button {
+                    self.state.isPaused = false
+                } label: {
+                    Label("Start Gateway", systemImage: "play.circle")
                 }
             }
-            Button {
-                Task { await self.state.setTalkEnabled(!self.state.talkEnabled) }
-            } label: {
-                Label(self.state.talkEnabled ? "Stop Talk Mode" : "Talk Mode", systemImage: "waveform.circle.fill")
-            }
-            .disabled(!voiceWakeSupported)
-            .opacity(voiceWakeSupported ? 1 : 0.5)
-            Divider()
-            Button("Settings…") { self.open(tab: .general) }
+
+            Button("Settings\u{2026}") { self.open(tab: .general) }
                 .keyboardShortcut(",", modifiers: [.command])
             self.debugMenu
-            Button("About OpenClaw") { self.open(tab: .about) }
+            Button("About Cullmate") { self.open(tab: .about) }
             if let updater, updater.isAvailable, self.updateStatus.isUpdateReady {
                 Button("Update ready, restart now?") { updater.checkForUpdates(nil) }
             }
@@ -182,14 +126,51 @@ struct MenuContent: View {
         }
     }
 
+    private var isGatewayRunning: Bool {
+        switch self.gatewayManager.status {
+        case .running, .starting, .attachedExisting:
+            return true
+        case .stopped, .failed:
+            return false
+        }
+    }
+
+    private var gatewayStatusLabel: String {
+        switch self.gatewayManager.status {
+        case .stopped:
+            return "Gateway stopped"
+        case .starting:
+            return "Gateway starting\u{2026}"
+        case .running:
+            return "Gateway running"
+        case .attachedExisting:
+            return "Gateway running"
+        case let .failed(reason):
+            return "Gateway failed: \(reason)"
+        }
+    }
+
+    private var gatewayStatusColor: Color {
+        switch self.gatewayManager.status {
+        case .stopped:
+            return .secondary
+        case .starting:
+            return .orange
+        case .running, .attachedExisting:
+            return .green
+        case .failed:
+            return .red
+        }
+    }
+
     private var connectionLabel: String {
         switch self.state.connectionMode {
         case .unconfigured:
-            "OpenClaw Not Configured"
+            "Cullmate"
         case .remote:
-            "Remote OpenClaw Active"
+            "Cullmate (Remote)"
         case .local:
-            "OpenClaw Active"
+            "Cullmate"
         }
     }
 
@@ -341,7 +322,33 @@ struct MenuContent: View {
             NSWorkspace.shared.open(url)
         } catch {
             let alert = NSAlert()
-            alert.messageText = "Dashboard unavailable"
+            alert.messageText = "Cullmate unavailable"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+        }
+    }
+
+    @MainActor
+    private func openDashboardWithModal(modal: String, sourcePath: String? = nil) async {
+        do {
+            let config = try await GatewayEndpointStore.shared.requireConfig()
+            var url = try GatewayEndpointStore.dashboardURL(for: config, mode: self.state.connectionMode)
+            // Append modal and optional source_path query params
+            if var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+                var items = components.queryItems ?? []
+                items.append(URLQueryItem(name: "modal", value: modal))
+                if let sourcePath, !sourcePath.isEmpty {
+                    items.append(URLQueryItem(name: "source_path", value: sourcePath))
+                }
+                components.queryItems = items
+                if let built = components.url {
+                    url = built
+                }
+            }
+            NSWorkspace.shared.open(url)
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Cullmate unavailable"
             alert.informativeText = error.localizedDescription
             alert.runModal()
         }

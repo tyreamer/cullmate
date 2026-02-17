@@ -36,6 +36,15 @@ export default defineConfig(() => {
       host: true,
       port: 5173,
       strictPort: true,
+      proxy: {
+        // Forward bootstrap config + internal paths to the gateway so the
+        // Vite dev UI can fetch the auto-generated auth token and connect.
+        "/__cullmate__": {
+          target: `http://127.0.0.1:${process.env.OPENCLAW_GATEWAY_PORT || "18789"}`,
+          changeOrigin: true,
+          ws: true,
+        },
+      },
     },
   };
 });

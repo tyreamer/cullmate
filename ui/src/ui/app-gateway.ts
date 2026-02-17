@@ -122,10 +122,20 @@ export function connectGateway(host: GatewayHost) {
   host.execApprovalQueue = [];
   host.execApprovalError = null;
 
+  const metaToken =
+    document.querySelector('meta[name="cullmate-auth-token"]')?.getAttribute("content") ??
+    undefined;
+  const windowAny = window as unknown as Record<string, unknown>;
+  const bootstrapToken =
+    typeof windowAny.__CULLMATE_AUTH_TOKEN__ === "string"
+      ? windowAny.__CULLMATE_AUTH_TOKEN__
+      : undefined;
+  const effectiveToken = host.settings.token.trim() || metaToken || bootstrapToken || undefined;
+
   const previousClient = host.client;
   const client = new GatewayBrowserClient({
     url: host.settings.gatewayUrl,
-    token: host.settings.token.trim() ? host.settings.token : undefined,
+    token: effectiveToken,
     password: host.password.trim() ? host.password : undefined,
     clientName: "openclaw-control-ui",
     mode: "webchat",
@@ -148,6 +158,8 @@ export function connectGateway(host: GatewayHost) {
       void loadNodes(host as unknown as OpenClawApp, { quiet: true });
       void loadDevices(host as unknown as OpenClawApp, { quiet: true });
       void refreshActiveTab(host as unknown as Parameters<typeof refreshActiveTab>[0]);
+      // Open deferred modal (e.g. ?modal=ingest) after gateway is ready
+      (host as unknown as { consumePendingModal: () => void }).consumePendingModal();
     },
     onClose: ({ code, reason }) => {
       if (host.client !== client) {
@@ -207,6 +219,21 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
 
   if (evt.event === "chat") {
     const payload = evt.payload as ChatEventPayload | undefined;
+    // Handle tool_update events for ingest progress
+    const chatPayloadAny = payload as unknown as Record<string, unknown> | undefined;
+    if (chatPayloadAny?.type === "tool_update") {
+      const toolPayload = chatPayloadAny as {
+        type: string;
+        tool?: string;
+        runId?: string;
+        update?: unknown;
+      };
+      if (toolPayload.tool === "photo.ingest_verify") {
+        (
+          host as unknown as { handleIngestToolUpdate: (p: typeof toolPayload) => void }
+        ).handleIngestToolUpdate(toolPayload);
+      }
+    }
     if (payload?.sessionKey) {
       setLastActiveSessionKey(
         host as unknown as Parameters<typeof setLastActiveSessionKey>[0],

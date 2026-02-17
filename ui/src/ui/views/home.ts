@@ -10,6 +10,7 @@ export type HomeViewState = {
   onSelectRecent: (p: RecentProject) => void;
   onOpenReport: (p: RecentProject) => void;
   onRevealProject: (p: RecentProject) => void;
+  onViewAllProjects?: () => void;
 };
 
 /** Turn a raw absolute path into a friendly display label. */
@@ -130,9 +131,9 @@ export function renderHome(state: HomeViewState) {
         state.recentProjects.length > 0
           ? html`
           <section class="home-section">
-            <h2 class="home-section__title">Recent Imports</h2>
+            <h2 class="home-section__title">Recent Projects</h2>
             <div class="home-recents">
-              ${state.recentProjects.map(
+              ${state.recentProjects.slice(0, 3).map(
                 (p) => html`
                   <div class="home-recent-card">
                     <div class="home-recent-card__info">
@@ -156,6 +157,29 @@ export function renderHome(state: HomeViewState) {
                 `,
               )}
             </div>
+            ${
+              state.recentProjects.length > 3 && state.onViewAllProjects
+                ? html`<a
+                  href="/projects"
+                  class="home-section__link"
+                  style="display: inline-block; margin-top: 8px; font-size: 0.85rem; color: var(--accent); cursor: pointer; text-decoration: none;"
+                  @click=${(e: MouseEvent) => {
+                    if (
+                      e.defaultPrevented ||
+                      e.button !== 0 ||
+                      e.metaKey ||
+                      e.ctrlKey ||
+                      e.shiftKey ||
+                      e.altKey
+                    ) {
+                      return;
+                    }
+                    e.preventDefault();
+                    state.onViewAllProjects!();
+                  }}
+                >View all projects \u2192</a>`
+                : nothing
+            }
           </section>
         `
           : nothing

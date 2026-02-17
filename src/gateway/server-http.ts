@@ -450,6 +450,7 @@ export function createGatewayHttpServer(opts: {
   /** Optional rate limiter for auth brute-force protection. */
   rateLimiter?: AuthRateLimiter;
   tlsOptions?: TlsOptions;
+  localAuthToken?: string;
 }): HttpServer {
   const {
     canvasHost,
@@ -578,6 +579,7 @@ export function createGatewayHttpServer(opts: {
             basePath: controlUiBasePath,
             config: configSnapshot,
             root: controlUiRoot,
+            authToken: opts.localAuthToken,
           })
         ) {
           return;

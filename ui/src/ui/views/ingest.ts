@@ -6,6 +6,7 @@ import type {
   RecentProject,
   SuggestedSource,
 } from "../controllers/ingest.ts";
+import { formatPathLabel } from "../controllers/storage.ts";
 
 export type IngestViewState = {
   stage: IngestStage;
@@ -13,6 +14,7 @@ export type IngestViewState = {
   destPath: string;
   projectName: string;
   verifyMode: "none" | "sentinel";
+  dedupeEnabled: boolean;
   progress: IngestProgress | null;
   result: IngestResult | null;
   error: string | null;
@@ -23,9 +25,11 @@ export type IngestViewState = {
   onDestPathChange: (v: string) => void;
   onProjectNameChange: (v: string) => void;
   onVerifyModeChange: (v: "none" | "sentinel") => void;
+  onDedupeChange: (v: boolean) => void;
   onSelectRecent: (p: RecentProject) => void;
   onPickSource: () => void;
   onPickDest: () => void;
+  onChangeStorage?: () => void;
   onSelectSuggestedSource: (s: SuggestedSource) => void;
   onStart: () => void;
   onClose: () => void;
@@ -219,10 +223,11 @@ function renderSuggestedSources(state: IngestViewState) {
 function renderPromptForm(state: IngestViewState) {
   const canStart =
     state.sourcePath.trim() && state.destPath.trim() && state.projectName.trim() && state.connected;
+  const dedupeNote = state.dedupeEnabled ? " \u00b7 Skips duplicates" : "";
   const modeLabel =
     state.verifyMode === "none"
-      ? "Creates a receipt \u00b7 Skips duplicates \u00b7 Copy only (never deletes originals)"
-      : "Creates a receipt \u00b7 Verifies a sample after copy \u00b7 Skips duplicates \u00b7 Copy only (never deletes originals)";
+      ? `Creates a receipt${dedupeNote} \u00b7 Copy only (never deletes originals)`
+      : `Creates a receipt \u00b7 Verifies a sample after copy${dedupeNote} \u00b7 Copy only (never deletes originals)`;
   return html`
     <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
       ${renderSuggestedSources(state)}
@@ -249,22 +254,27 @@ function renderPromptForm(state: IngestViewState) {
       </div>
       <div style="display: flex; flex-direction: column; gap: 4px;">
         <span style="font-size: 0.8rem; color: var(--muted);">Save to</span>
-        <div style="display: flex; gap: 6px; align-items: stretch;">
-          <input
-            type="text"
-            class="mono"
-            placeholder="~/Pictures/Cullmate"
-            .value=${state.destPath}
-            @input=${(e: InputEvent) => state.onDestPathChange((e.target as HTMLInputElement).value)}
-            style="flex: 1; background: var(--secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); font-size: 0.85rem;"
-          />
-          <button
-            class="btn btn--sm"
-            @click=${state.onPickDest}
-            ?disabled=${!state.connected}
-            title="Browse for destination folder"
-            style="padding: 6px 12px; white-space: nowrap;"
-          >Choose&hellip;</button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span
+            style="display: inline-flex; align-items: center; gap: 6px; background: var(--secondary); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 0.82rem;"
+          >
+            <span style="font-weight: 500;">${formatPathLabel(state.destPath)}</span>
+            <span class="mono" style="font-size: 0.72rem; color: var(--muted);">${state.destPath}</span>
+          </span>
+          ${
+            state.onChangeStorage
+              ? html`<button
+                class="btn btn--sm"
+                @click=${state.onChangeStorage}
+                style="padding: 4px 10px; font-size: 0.75rem;"
+              >Change\u2026</button>`
+              : html`<button
+                class="btn btn--sm"
+                @click=${state.onPickDest}
+                ?disabled=${!state.connected}
+                style="padding: 4px 10px; font-size: 0.75rem;"
+              >Change\u2026</button>`
+          }
         </div>
       </div>
       <label style="display: flex; flex-direction: column; gap: 4px;">
@@ -295,6 +305,14 @@ function renderPromptForm(state: IngestViewState) {
           <div style="font-size: 0.7rem; color: ${state.verifyMode === "sentinel" ? "inherit" : "var(--muted)"};">Hash + verify a sample after copy</div>
         </button>
       </div>
+      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 0;">
+        <input
+          type="checkbox"
+          .checked=${state.dedupeEnabled}
+          @change=${(e: Event) => state.onDedupeChange((e.target as HTMLInputElement).checked)}
+        />
+        <span style="font-size: 0.82rem;">Skip duplicate files</span>
+      </label>
       <div style="font-size: 0.75rem; color: var(--muted); padding: 4px 0;">
         ${modeLabel}
       </div>

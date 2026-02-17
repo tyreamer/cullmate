@@ -75,8 +75,11 @@ import { renderInstances } from "./views/instances.ts";
 import { renderLogs } from "./views/logs.ts";
 import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
+import { renderProjectsView } from "./views/projects.ts";
 import { renderSessions } from "./views/sessions.ts";
+import { renderSettingsView } from "./views/settings.ts";
 import { renderSkills } from "./views/skills.ts";
+import { renderStorageSetup } from "./views/storage-setup.ts";
 
 const ADVANCED_TABS = new Set<Tab>([
   "overview",
@@ -117,6 +120,54 @@ function resolveAssistantAvatarUrl(state: AppViewState): string | undefined {
 }
 
 export function renderApp(state: AppViewState) {
+  // Gate: show storage setup if no config and not in developer mode
+  const needsStorageSetup = !state.storageConfig && !state.settings.developerMode;
+  if (needsStorageSetup || state.isStorageSetupOpen) {
+    return renderStorageSetup({
+      primaryDest: state.storageSetupPrimaryDest,
+      backupDest: state.storageSetupBackupDest,
+      volumes: state.storageSetupVolumes,
+      volumesLoading: state.storageSetupVolumesLoading,
+      connected: state.connected,
+      editing: state.isStorageSetupOpen && !!state.storageConfig,
+      onPrimaryChange: (path) => (state.storageSetupPrimaryDest = path),
+      onBackupChange: (path) => (state.storageSetupBackupDest = path),
+      onPickPrimary: async () => {
+        if (!state.client) {
+          return;
+        }
+        const { pickFolder } = await import("./controllers/ingest.ts");
+        try {
+          const result = await pickFolder(state.client, { prompt: "Choose primary folder" });
+          if (result.ok) {
+            state.storageSetupPrimaryDest = result.path;
+          }
+        } catch {
+          /* ignore */
+        }
+      },
+      onPickBackup: async () => {
+        if (!state.client) {
+          return;
+        }
+        const { pickFolder } = await import("./controllers/ingest.ts");
+        try {
+          const result = await pickFolder(state.client, { prompt: "Choose backup folder" });
+          if (result.ok) {
+            state.storageSetupBackupDest = result.path;
+          }
+        } catch {
+          /* ignore */
+        }
+      },
+      onSave: (cfg) => state.handleSaveStorageSetup(cfg),
+      onCancel:
+        state.isStorageSetupOpen && state.storageConfig
+          ? () => (state.isStorageSetupOpen = false)
+          : undefined,
+    });
+  }
+
   const presenceCount = state.presenceEntries.length;
   const sessionsCount = state.sessionsResult?.count ?? null;
   const cronNext = state.cronStatus?.nextWakeAtMs ?? null;
@@ -170,24 +221,28 @@ export function renderApp(state: AppViewState) {
                 >${entry.label}</a>
               `,
             )}
-            <a
-              href=${pathForTab("overview" as Tab, state.basePath)}
-              class="topnav__link ${!["home", "config"].includes(state.tab) ? "active" : ""}"
-              @click=${(e: MouseEvent) => {
-                if (
-                  e.defaultPrevented ||
-                  e.button !== 0 ||
-                  e.metaKey ||
-                  e.ctrlKey ||
-                  e.shiftKey ||
-                  e.altKey
-                ) {
-                  return;
-                }
-                e.preventDefault();
-                state.setTab("overview" as Tab);
-              }}
-            >Advanced</a>
+            ${
+              state.settings.developerMode
+                ? html`<a
+                  href=${pathForTab("overview" as Tab, state.basePath)}
+                  class="topnav__link ${isAdvancedTab(state.tab) ? "active" : ""}"
+                  @click=${(e: MouseEvent) => {
+                    if (
+                      e.defaultPrevented ||
+                      e.button !== 0 ||
+                      e.metaKey ||
+                      e.ctrlKey ||
+                      e.shiftKey ||
+                      e.altKey
+                    ) {
+                      return;
+                    }
+                    e.preventDefault();
+                    state.setTab("overview" as Tab);
+                  }}
+                >Developer</a>`
+                : nothing
+            }
           </nav>
         </div>
         <div class="topbar-status">
@@ -258,9 +313,9 @@ export function renderApp(state: AppViewState) {
         `
           : nothing
       }
-      <main class="content ${isChat ? "content--chat" : ""} ${state.tab === "home" ? "content--home" : ""}">
+      <main class="content ${isChat ? "content--chat" : ""} ${state.tab === "home" || state.tab === "projects" || state.tab === "settings" ? "content--home" : ""}">
         ${
-          state.tab !== "home"
+          state.tab !== "home" && state.tab !== "projects" && state.tab !== "settings"
             ? html`
             <section class="content-header">
               <div>
@@ -298,6 +353,54 @@ export function renderApp(state: AppViewState) {
                 onRevealProject: (p) => {
                   if (state.client) {
                     void openPath(state.client, p.projectRoot, p.destPath, true).catch(() => {});
+                  }
+                },
+                onViewAllProjects: () => state.setTab("projects" as Tab),
+              })
+            : nothing
+        }
+
+        ${
+          state.tab === "projects"
+            ? renderProjectsView({
+                recentProjects: state.ingestRecentProjects,
+                onOpenFolder: (p) => {
+                  if (state.client) {
+                    void openPath(state.client, p.projectRoot, p.destPath, true).catch(() => {});
+                  }
+                },
+                onOpenReport: (p) => {
+                  if (p.reportPath && state.client) {
+                    void openPath(state.client, p.reportPath, p.projectRoot, false).catch(() => {});
+                  }
+                },
+                onImportClick: () => state.handleIngestOpen(),
+              })
+            : nothing
+        }
+
+        ${
+          state.tab === "settings"
+            ? renderSettingsView({
+                settings: state.settings,
+                connected: state.connected,
+                storageConfig: state.storageConfig,
+                onSettingsChange: (next) => state.applySettings(next),
+                onChangeStorage: () => state.handleOpenStorageSetup(),
+                onPickFolder: async () => {
+                  if (!state.client) {
+                    return;
+                  }
+                  const { pickFolder } = await import("./controllers/ingest.ts");
+                  try {
+                    const result = await pickFolder(state.client, {
+                      prompt: "Choose default save location",
+                    });
+                    if (result.ok) {
+                      state.applySettings({ ...state.settings, defaultSaveLocation: result.path });
+                    }
+                  } catch (err) {
+                    console.error("Failed to pick folder:", err);
                   }
                 },
               })
@@ -1059,6 +1162,7 @@ export function renderApp(state: AppViewState) {
         destPath: state.ingestDestPath,
         projectName: state.ingestProjectName,
         verifyMode: state.ingestVerifyMode,
+        dedupeEnabled: state.ingestDedupeEnabled,
         progress: state.ingestProgress,
         result: state.ingestResult,
         error: state.ingestError,
@@ -1069,6 +1173,7 @@ export function renderApp(state: AppViewState) {
         onDestPathChange: (v) => (state.ingestDestPath = v),
         onProjectNameChange: (v) => (state.ingestProjectName = v),
         onVerifyModeChange: (v) => (state.ingestVerifyMode = v),
+        onDedupeChange: (v) => (state.ingestDedupeEnabled = v),
         onSelectRecent: (p) => {
           state.ingestSourcePath = p.sourcePath;
           state.ingestDestPath = p.destPath;
@@ -1076,6 +1181,7 @@ export function renderApp(state: AppViewState) {
         },
         onPickSource: () => void state.handleIngestPickSource(),
         onPickDest: () => void state.handleIngestPickDest(),
+        onChangeStorage: state.storageConfig ? () => state.handleOpenStorageSetup() : undefined,
         onSelectSuggestedSource: (s) => state.handleIngestSelectSuggestedSource(s),
         onStart: () => void state.handleIngestStart(),
         onClose: () => state.handleIngestClose(),

@@ -280,6 +280,7 @@ export async function startGatewayServer(
     resolvedAuth,
     tailscaleConfig,
     tailscaleMode,
+    localAuthToken,
   } = runtimeConfig;
   let hooksConfig = runtimeConfig.hooksConfig;
   const canvasHostEnabled = runtimeConfig.canvasHostEnabled;
@@ -360,6 +361,7 @@ export async function startGatewayServer(
     openResponsesEnabled,
     openResponsesConfig,
     resolvedAuth,
+    localAuthToken,
     rateLimiter: authRateLimiter,
     gatewayTls,
     hooksConfig: () => hooksConfig,
@@ -597,6 +599,9 @@ export async function startGatewayServer(
     log,
     isNixMode,
   });
+  if (localAuthToken) {
+    log.info("gateway: local auth token auto-generated (zero-touch auth enabled)");
+  }
   if (!minimalTestGateway) {
     scheduleGatewayUpdateCheck({ cfg: cfgAtStart, log, isNixMode });
   }

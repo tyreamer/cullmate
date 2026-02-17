@@ -3,7 +3,16 @@ import type { CompactionStatus } from "./app-tool-stream.ts";
 import type { DevicePairingList } from "./controllers/devices.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals.ts";
+import type {
+  IngestProgress,
+  IngestResult,
+  IngestStage,
+  RecentProject,
+  SuggestedSource,
+  VolumeEntry,
+} from "./controllers/ingest.ts";
 import type { SkillMessage } from "./controllers/skills.ts";
+import type { StorageConfig } from "./controllers/storage.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
 import type { UiSettings } from "./storage.ts";
@@ -72,6 +81,25 @@ export type AppViewState = {
   sidebarContent: string | null;
   sidebarError: string | null;
   splitRatio: number;
+  // Ingest state
+  ingestStage: IngestStage;
+  ingestSourcePath: string;
+  ingestDestPath: string;
+  ingestProjectName: string;
+  ingestProgress: IngestProgress | null;
+  ingestResult: IngestResult | null;
+  ingestError: string | null;
+  ingestVerifyMode: "none" | "sentinel";
+  ingestDedupeEnabled: boolean;
+  ingestRecentProjects: RecentProject[];
+  ingestSuggestedSources: SuggestedSource[];
+  // Storage setup state
+  storageConfig: StorageConfig | null;
+  isStorageSetupOpen: boolean;
+  storageSetupVolumes: VolumeEntry[];
+  storageSetupVolumesLoading: boolean;
+  storageSetupPrimaryDest: string;
+  storageSetupBackupDest: string;
   scrollToBottom: (opts?: { smooth?: boolean }) => void;
   devicesLoading: boolean;
   devicesError: string | null;
@@ -282,4 +310,17 @@ export type AppViewState = {
   handleOpenSidebar: (content: string) => void;
   handleCloseSidebar: () => void;
   handleSplitRatioChange: (ratio: number) => void;
+  // Ingest handlers
+  handleIngestOpen: () => void;
+  handleIngestClose: () => void;
+  handleIngestStart: () => Promise<void>;
+  handleIngestOpenReport: () => Promise<void>;
+  handleIngestRevealProject: () => Promise<void>;
+  handleIngestSourcePathChange: (v: string) => void;
+  handleIngestPickSource: () => Promise<void>;
+  handleIngestPickDest: () => Promise<void>;
+  handleIngestSelectSuggestedSource: (s: SuggestedSource) => void;
+  // Storage setup handlers
+  handleOpenStorageSetup: () => void;
+  handleSaveStorageSetup: (cfg: StorageConfig) => void;
 };

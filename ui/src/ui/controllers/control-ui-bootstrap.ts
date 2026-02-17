@@ -43,6 +43,13 @@ export async function loadControlUiBootstrapConfig(state: ControlUiBootstrapStat
     state.assistantName = normalized.name;
     state.assistantAvatar = normalized.avatar;
     state.assistantAgentId = normalized.agentId ?? null;
+    // Expose auth token for dev mode (Vite-served HTML has no injection).
+    if (parsed.authToken && typeof parsed.authToken === "string") {
+      const w = window as unknown as Record<string, unknown>;
+      if (!w.__CULLMATE_AUTH_TOKEN__) {
+        w.__CULLMATE_AUTH_TOKEN__ = parsed.authToken;
+      }
+    }
   } catch {
     // Ignore bootstrap failures; UI will update identity after connecting.
   }

@@ -4,6 +4,7 @@ import type {
   GatewayTailscaleConfig,
   loadConfig,
 } from "../config/config.js";
+import { resolveStateDir } from "../config/paths.js";
 import {
   assertGatewayAuthConfigured,
   type ResolvedGatewayAuth,
@@ -11,6 +12,7 @@ import {
 } from "./auth.js";
 import { normalizeControlUiBasePath } from "./control-ui-shared.js";
 import { resolveHooksConfig } from "./hooks.js";
+import { ensureLocalAuthToken } from "./local-auth-token.js";
 import { isLoopbackHost, resolveGatewayBindHost } from "./net.js";
 
 export type GatewayRuntimeConfig = {
@@ -27,6 +29,7 @@ export type GatewayRuntimeConfig = {
   tailscaleMode: "off" | "serve" | "funnel";
   hooksConfig: ReturnType<typeof resolveHooksConfig>;
   canvasHostEnabled: boolean;
+  localAuthToken?: string;
 };
 
 export async function resolveGatewayRuntimeConfig(params: {
@@ -70,11 +73,28 @@ export async function resolveGatewayRuntimeConfig(params: {
     ...tailscaleOverrides,
   };
   const tailscaleMode = tailscaleConfig.mode ?? "off";
-  const resolvedAuth = resolveGatewayAuth({
+  let resolvedAuth = resolveGatewayAuth({
     authConfig,
     env: process.env,
     tailscaleMode,
   });
+
+  // Auto-bootstrap: when no auth is configured and gateway binds to loopback,
+  // generate a local auth token so the web UI can connect without user interaction.
+  let localAuthToken: string | undefined;
+  if (resolvedAuth.mode === "none" && isLoopbackHost(bindHost)) {
+    try {
+      localAuthToken = ensureLocalAuthToken(resolveStateDir());
+      resolvedAuth = resolveGatewayAuth({
+        authConfig: { ...authConfig, token: localAuthToken },
+        env: process.env,
+        tailscaleMode,
+      });
+    } catch {
+      // If token bootstrap fails (e.g., read-only filesystem), continue with mode "none"
+    }
+  }
+
   const authMode: ResolvedGatewayAuth["mode"] = resolvedAuth.mode;
   const hasToken = typeof resolvedAuth.token === "string" && resolvedAuth.token.trim().length > 0;
   const hasPassword =
@@ -131,5 +151,6 @@ export async function resolveGatewayRuntimeConfig(params: {
     tailscaleMode,
     hooksConfig,
     canvasHostEnabled,
+    localAuthToken,
   };
 }

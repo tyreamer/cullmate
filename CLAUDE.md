@@ -57,6 +57,7 @@ To run a single test file: `pnpm vitest run src/path/to/file.test.ts`
 - `src/commands/` — Individual command implementations
 - `src/gateway/` — Gateway WebSocket server (Express + WS), RPC methods in `server-methods/`
 - `src/agents/` — Pi agent runtime, tool implementations (`tools/`), auth profiles (`auth-profiles/`)
+- `src/photo/` — Photo ingest pipeline: scan, copy, hash, verify, report generation (see "Photo Ingest Pipeline" below)
 - `src/channels/` — Shared channel logic (routing, presence, limits, chunking)
 - `src/config/` — Config loading/validation (Zod schemas), session store
 - `src/infra/` — Infrastructure utilities (ports, binaries, dotenv, errors, runtime guards)
@@ -64,16 +65,73 @@ To run a single test file: `pnpm vitest run src/path/to/file.test.ts`
 - `src/memory/` — QMD (Quantized Memory Database) and embeddings
 - `src/browser/` — Browser control (Chrome/Chromium instance management, actions)
 - `src/plugin-sdk/` — Plugin SDK types and runtime for extensions
+- `src/routing/` — Session key parsing and routing logic
+- `src/cron/` — Cron job scheduling and execution
+- `src/providers/` — LLM provider integrations
+- `src/sessions/` — Session management and storage
 
 ### Other important directories
 
 - `ui/` — Web UI (Lit components, Vite build)
+- `ui/src/ui/controllers/` — UI data controllers: RPC helpers, state management (~30 files)
+- `ui/src/ui/views/` — UI view rendering functions: one per tab/feature (~57 files)
 - `extensions/` — Plugin packages (workspace packages: msteams, matrix, bluebubbles, zalo, etc.)
 - `skills/` — Bundled skills (50+)
 - `apps/macos/` — macOS companion app (SwiftUI menu bar)
 - `docs/` — Documentation (Mintlify-hosted)
 - `test/` — Global test setup and helpers
 - `config/` — Cullmate default config (`cullmate-defaults.json`)
+
+## Photo Ingest Pipeline
+
+The core Cullmate feature: non-destructive photo import from SD cards/folders to organized projects.
+
+**Pipeline** (`src/photo/`):
+
+1. **Scan** (`scan.ts`) — Walks source directory, filters for media files (jpg, cr2, nef, arw, dng, mov, mp4, png, tiff, heic, etc.), skips dotfiles and non-media
+2. **Copy** (`copy.ts`) — Streams files to `<dest>/<ProjectName>/01_RAW/` preserving subdirectory structure, computes hash during copy (sha256 or blake3)
+3. **Verify** (`verify.ts`) — Optional post-copy integrity check: `none` (skip), `sentinel` (sample), `full` (all files)
+4. **Dedupe** — Opt-in (`dedupe: true`): pre-hashes files, skips identical content across subdirectories (e.g. dual-card shoots). OFF by default.
+5. **Report** (`report.ts`) — Generates HTML receipt + JSON manifest in `<project>/.cullmate/`
+
+**Types** (`src/photo/types.ts`): `IngestParams`, `IngestManifest`, `IngestProgressEvent`
+
+**Project structure created**:
+
+```
+<dest>/<ProjectName>/
+├── 01_RAW/          # Copied media files (preserves subdirs)
+├── 02_EXPORTS/      # Empty (for user's edits)
+├── 03_DELIVERY/     # Empty (for final deliverables)
+└── .cullmate/       # Manifest JSON + HTML receipt
+```
+
+**Agent tool**: `photo.ingest_verify` (`src/agents/tools/ingest-verify-tool.ts`) — Exposes ingest as an RPC-callable tool with progress streaming.
+
+## UI Architecture (Photographer-First)
+
+The UI is a photographer-first app with a simple 3-tab primary navigation. Advanced OpenClaw features are hidden behind Developer Mode.
+
+**Primary tabs** (always visible): Home, Projects, Settings
+**Advanced tabs** (Developer Mode only): Chat, Overview, Channels, Instances, Sessions, Usage, Cron, Agents, Skills, Nodes, Config, Debug, Logs
+
+**Key UI files**:
+
+- `ui/src/ui/app.ts` — Main `OpenClawApp` LitElement with all `@state()` fields
+- `ui/src/ui/app-view-state.ts` — `AppViewState` type (all state + handler signatures)
+- `ui/src/ui/app-render.ts` — `renderApp()` top-level render function
+- `ui/src/ui/navigation.ts` — `Tab` union type, `PRIMARY_TABS`, `ADVANCED_TAB_GROUPS`
+- `ui/src/ui/storage.ts` — `UiSettings` (localStorage persistence, includes `developerMode`, `defaultSaveLocation`, `defaultVerifyMode`)
+
+**Storage setup** (first-run onboarding):
+
+- `ui/src/ui/controllers/storage.ts` — `StorageConfig` (primaryDest + backupDest), localStorage persistence
+- `ui/src/ui/views/storage-setup.ts` — Two-step setup dialog (primary + backup), volume cards, same-folder/same-volume validation
+- App is gated: if no `StorageConfig` exists and Developer Mode is off, only the setup screen renders
+
+**View pattern**: Each tab has a `renderXxx(state: XxxViewState)` function in `ui/src/ui/views/`. Views receive a typed state prop object (never the full AppViewState) and return Lit `html` templates.
+
+**Controller pattern**: `ui/src/ui/controllers/` files handle RPC calls to the gateway and state mutations. They receive the app state object and mutate it directly (Lit reactivity).
 
 ## Tech Stack
 

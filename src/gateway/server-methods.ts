@@ -80,6 +80,8 @@ const READ_METHODS = new Set([
   "config.get",
   "talk.config",
   "tools.invoke",
+  "system.pick_folder",
+  "system.list_volumes",
 ]);
 const WRITE_METHODS = new Set([
   "send",

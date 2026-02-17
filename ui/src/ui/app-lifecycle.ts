@@ -40,13 +40,17 @@ type LifecycleHost = {
 
 export function handleConnected(host: LifecycleHost) {
   host.basePath = inferBasePath();
-  void loadControlUiBootstrapConfig(host);
   applySettingsFromUrl(host as unknown as Parameters<typeof applySettingsFromUrl>[0]);
+  // Read ?modal=ingest&source_path=... for deferred open after gateway connects
+  (host as unknown as { readModalParams: () => void }).readModalParams();
   syncTabWithLocation(host as unknown as Parameters<typeof syncTabWithLocation>[0], true);
   syncThemeWithSettings(host as unknown as Parameters<typeof syncThemeWithSettings>[0]);
   attachThemeListener(host as unknown as Parameters<typeof attachThemeListener>[0]);
   window.addEventListener("popstate", host.popStateHandler);
-  connectGateway(host as unknown as Parameters<typeof connectGateway>[0]);
+  // Load bootstrap config first (sets auth token for dev mode), then connect.
+  void loadControlUiBootstrapConfig(host).then(() => {
+    connectGateway(host as unknown as Parameters<typeof connectGateway>[0]);
+  });
   startNodesPolling(host as unknown as Parameters<typeof startNodesPolling>[0]);
   if (host.tab === "logs") {
     startLogsPolling(host as unknown as Parameters<typeof startLogsPolling>[0]);

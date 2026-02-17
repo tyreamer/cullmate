@@ -243,8 +243,8 @@ actor GatewayEndpointStore {
         if let modeRaw {
             initialMode = AppState.ConnectionMode(rawValue: modeRaw) ?? .local
         } else {
-            let seen = UserDefaults.standard.bool(forKey: "openclaw.onboardingSeen")
-            initialMode = seen ? .local : .unconfigured
+            // Cullmate defaults to local mode — gateway should always auto-start.
+            initialMode = .local
         }
 
         let port = deps.localPort()

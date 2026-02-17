@@ -5,6 +5,14 @@ import type { AppViewState } from "./app-view-state.ts";
 import type { DevicePairingList } from "./controllers/devices.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals.ts";
+import type {
+  IngestProgress,
+  IngestResult,
+  IngestStage,
+  RecentProject,
+  SuggestedSource,
+  VolumeEntry,
+} from "./controllers/ingest.ts";
 import type { SkillMessage } from "./controllers/skills.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
@@ -78,6 +86,7 @@ import {
 } from "./app-tool-stream.ts";
 import { normalizeAssistantIdentity } from "./assistant-identity.ts";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity.ts";
+import { loadStorageConfig, saveStorageConfig, type StorageConfig } from "./controllers/storage.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
 
@@ -85,6 +94,18 @@ declare global {
   interface Window {
     __OPENCLAW_CONTROL_UI_BASE_PATH__?: string;
   }
+}
+
+function suggestProjectNameClient(sourcePath: string): string {
+  const now = new Date();
+  const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+  const segments = sourcePath.split(/[/\\]/).filter(Boolean);
+  const last = segments.at(-1);
+  if (!last) {
+    return "";
+  }
+  const sanitized = last.replace(/[^a-zA-Z0-9._-]/g, "_");
+  return `${ymd}_${sanitized}`;
 }
 
 const bootAssistantIdentity = normalizeAssistantIdentity({});
@@ -142,6 +163,33 @@ export class OpenClawApp extends LitElement {
   @state() sidebarContent: string | null = null;
   @state() sidebarError: string | null = null;
   @state() splitRatio = this.settings.splitRatio;
+
+  // Ingest modal state
+  @state() ingestStage: IngestStage = "idle";
+  @state() ingestSourcePath = "";
+  @state() ingestDestPath = "";
+  @state() ingestProjectName = "";
+  @state() ingestProgress: IngestProgress | null = null;
+  @state() ingestResult: IngestResult | null = null;
+  @state() ingestError: string | null = null;
+  @state() ingestRunId: string | null = null;
+  @state() ingestVerifyMode: "none" | "sentinel" = "none";
+  @state() ingestDedupeEnabled = false;
+  @state() ingestRecentProjects: RecentProject[] = [];
+  @state() ingestSuggestedSources: SuggestedSource[] = [];
+  private ingestSuggestedName = "";
+  // Deferred modal open via ?modal=ingest&source_path=... query params
+  private pendingModalIngest = false;
+  private pendingSourcePath: string | null = null;
+  private lastProgressUpdateAt = 0;
+
+  // Storage setup state
+  @state() storageConfig: StorageConfig | null = loadStorageConfig();
+  @state() isStorageSetupOpen = false;
+  @state() storageSetupVolumes: VolumeEntry[] = [];
+  @state() storageSetupVolumesLoading = false;
+  @state() storageSetupPrimaryDest = "";
+  @state() storageSetupBackupDest = "";
 
   @state() nodesLoading = false;
   @state() nodes: Array<Record<string, unknown>> = [];
@@ -530,6 +578,261 @@ export class OpenClawApp extends LitElement {
 
   handleGatewayUrlCancel() {
     this.pendingGatewayUrl = null;
+  }
+
+  // Ingest handlers
+  /** Called after gateway connects to open deferred modals from URL params. */
+  consumePendingModal() {
+    // If no storage config, auto-load volumes for the first-run setup screen
+    if (!this.storageConfig && !this.settings.developerMode) {
+      this.handleOpenStorageSetup();
+    }
+    if (!this.pendingModalIngest) {
+      return;
+    }
+    this.pendingModalIngest = false;
+    const prefillSource = this.pendingSourcePath;
+    this.pendingSourcePath = null;
+    void this.handleIngestOpen().then(() => {
+      if (prefillSource) {
+        this.handleIngestSourcePathChange(prefillSource);
+      }
+    });
+    // Clean the URL params so refresh doesn't re-trigger
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("modal");
+      url.searchParams.delete("source_path");
+      window.history.replaceState({}, "", url.toString());
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /** Read URL params and stash for deferred opening after gateway connects. */
+  readModalParams() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("modal") === "ingest") {
+        this.pendingModalIngest = true;
+        const sourcePath = params.get("source_path");
+        if (sourcePath) {
+          this.pendingSourcePath = decodeURIComponent(sourcePath);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async handleIngestOpen() {
+    const { loadRecentProjects, listVolumes } = await import("./controllers/ingest.ts");
+    this.ingestStage = "prompting";
+    this.ingestSourcePath = "";
+    this.ingestDestPath =
+      this.storageConfig?.primaryDest || this.settings.defaultSaveLocation || "~/Pictures/Cullmate";
+    this.ingestProjectName = "";
+    this.ingestVerifyMode = this.settings.defaultVerifyMode || "none";
+    this.ingestDedupeEnabled = false;
+    this.ingestProgress = null;
+    this.ingestResult = null;
+    this.ingestError = null;
+    this.ingestRunId = null;
+    this.ingestSuggestedName = "";
+    this.ingestRecentProjects = loadRecentProjects();
+    this.ingestSuggestedSources = [];
+    // Load detected volumes in the background
+    if (this.client) {
+      listVolumes(this.client)
+        .then((result) => {
+          this.ingestSuggestedSources = result.suggestedSources;
+        })
+        .catch(() => {
+          // Silently ignore — detected sources are a convenience, not critical
+        });
+    }
+  }
+
+  handleIngestSourcePathChange(v: string) {
+    this.ingestSourcePath = v;
+    // Auto-suggest project name if user hasn't typed a custom name
+    if (!this.ingestProjectName || this.ingestProjectName === this.ingestSuggestedName) {
+      const suggested = suggestProjectNameClient(v);
+      this.ingestSuggestedName = suggested;
+      this.ingestProjectName = suggested;
+    }
+  }
+
+  async handleIngestPickSource() {
+    if (!this.client) {
+      return;
+    }
+    const { pickFolder } = await import("./controllers/ingest.ts");
+    try {
+      const result = await pickFolder(this.client, { prompt: "Choose source folder" });
+      if (result.ok) {
+        this.handleIngestSourcePathChange(result.path);
+      }
+    } catch (err) {
+      console.error("Failed to pick source folder:", err);
+    }
+  }
+
+  async handleIngestPickDest() {
+    if (!this.client) {
+      return;
+    }
+    const { pickFolder } = await import("./controllers/ingest.ts");
+    try {
+      const result = await pickFolder(this.client, { prompt: "Choose destination folder" });
+      if (result.ok) {
+        this.ingestDestPath = result.path;
+      }
+    } catch (err) {
+      console.error("Failed to pick destination folder:", err);
+    }
+  }
+
+  handleIngestSelectSuggestedSource(s: SuggestedSource) {
+    this.handleIngestSourcePathChange(s.path);
+  }
+
+  handleIngestClose() {
+    this.ingestStage = "idle";
+    this.ingestRunId = null;
+  }
+
+  async handleIngestStart() {
+    if (
+      !this.client ||
+      !this.ingestSourcePath.trim() ||
+      !this.ingestDestPath.trim() ||
+      !this.ingestProjectName.trim()
+    ) {
+      return;
+    }
+    this.ingestStage = "running";
+    this.ingestProgress = null;
+    this.ingestError = null;
+    this.lastProgressUpdateAt = 0;
+    try {
+      const { runIngestVerify, saveRecentProject } = await import("./controllers/ingest.ts");
+      const result = await runIngestVerify(this.client, {
+        source_path: this.ingestSourcePath.trim(),
+        dest_project_path: this.ingestDestPath.trim(),
+        project_name: this.ingestProjectName.trim(),
+        verify_mode: this.ingestVerifyMode,
+        hash_algo: "blake3",
+        overwrite: false,
+        dedupe: this.ingestDedupeEnabled,
+      });
+      this.ingestResult = result;
+      this.ingestStage = "done";
+      if (result.ok && result.project_root) {
+        saveRecentProject({
+          projectName: this.ingestProjectName.trim(),
+          projectRoot: result.project_root,
+          reportPath: result.report_path,
+          destPath: this.ingestDestPath.trim(),
+          sourcePath: this.ingestSourcePath.trim(),
+          timestamp: Date.now(),
+        });
+      }
+    } catch (err) {
+      this.ingestError = err instanceof Error ? err.message : String(err);
+      this.ingestStage = "error";
+    }
+  }
+
+  async handleIngestOpenReport() {
+    if (!this.client || !this.ingestResult?.report_path || !this.ingestResult?.project_root) {
+      return;
+    }
+    const { openPath } = await import("./controllers/ingest.ts");
+    try {
+      await openPath(this.client, this.ingestResult.report_path, this.ingestResult.project_root);
+    } catch (err) {
+      console.error("Failed to open report:", err);
+    }
+  }
+
+  async handleIngestRevealProject() {
+    if (!this.client || !this.ingestResult?.project_root) {
+      return;
+    }
+    const { openPath } = await import("./controllers/ingest.ts");
+    try {
+      await openPath(
+        this.client,
+        this.ingestResult.project_root,
+        this.ingestResult.project_root,
+        true,
+      );
+    } catch (err) {
+      console.error("Failed to reveal project:", err);
+    }
+  }
+
+  handleIngestToolUpdate(payload: { runId?: string; update?: unknown }) {
+    if (this.ingestStage !== "running") {
+      return;
+    }
+    const update = payload.update as { details?: IngestProgress } | undefined;
+    if (!update?.details?.type) {
+      return;
+    }
+    const details = update.details;
+    // Always pass through stage transitions and final events immediately
+    const isStageChange = details.type !== this.ingestProgress?.type;
+    const isFinal = details.type === "ingest.done" || details.type === "ingest.report.generated";
+    if (isFinal || isStageChange) {
+      this.ingestProgress = details;
+      this.lastProgressUpdateAt = Date.now();
+      return;
+    }
+    // Throttle to max 10 updates/sec for same-stage progress
+    const now = Date.now();
+    if (now - this.lastProgressUpdateAt >= 100) {
+      this.ingestProgress = details;
+      this.lastProgressUpdateAt = now;
+    }
+  }
+
+  // Storage setup handlers
+  handleOpenStorageSetup() {
+    this.isStorageSetupOpen = true;
+    this.storageSetupPrimaryDest = this.storageConfig?.primaryDest ?? "";
+    this.storageSetupBackupDest = this.storageConfig?.backupDest ?? "";
+    this.storageSetupVolumesLoading = true;
+    // Load volumes in background
+    if (this.client) {
+      import("./controllers/ingest.ts")
+        .then(({ listVolumes }) => {
+          listVolumes(this.client!)
+            .then((result) => {
+              this.storageSetupVolumes = result.volumes;
+              this.storageSetupVolumesLoading = false;
+            })
+            .catch(() => {
+              this.storageSetupVolumesLoading = false;
+            });
+        })
+        .catch(() => {
+          this.storageSetupVolumesLoading = false;
+        });
+    } else {
+      this.storageSetupVolumesLoading = false;
+    }
+  }
+
+  handleSaveStorageSetup(cfg: StorageConfig) {
+    saveStorageConfig(cfg);
+    this.storageConfig = cfg;
+    this.isStorageSetupOpen = false;
+    // Update ingest dest path if the import modal is open
+    if (this.ingestStage === "prompting") {
+      this.ingestDestPath = cfg.primaryDest;
+    }
   }
 
   // Sidebar handlers for tool output viewing
