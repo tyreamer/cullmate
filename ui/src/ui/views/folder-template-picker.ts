@@ -1,21 +1,25 @@
 import { html, nothing } from "lit";
 import type { FolderTemplate } from "../../../../src/photo/folder-template.js";
+import type { SmartOrganizerStatus } from "../controllers/ai-provider.ts";
 import { renderFolderTreePreview } from "./folder-tree-preview.ts";
 
 export type FolderTemplatePickerState = {
   presets: FolderTemplate[];
   selectedTemplate: FolderTemplate | null;
   customTemplate: FolderTemplate | null;
-  ollamaAvailable: boolean;
-  ollamaPrompt: string;
-  ollamaGenerating: boolean;
-  ollamaError: string | null;
-  ollamaModels: string[];
-  ollamaSelectedModel: string;
+  // Smart Organizer state (replaces Ollama-specific props)
+  smartOrganizerStatus: SmartOrganizerStatus;
+  smartOrganizerPrompt: string;
+  smartOrganizerGenerating: boolean;
+  smartOrganizerError: string | null;
+  smartOrganizerStatusMessage: string | null;
+  // Dev-only details
+  developerMode: boolean;
+  devProviderInfo: string | null;
   onSelectPreset: (t: FolderTemplate) => void;
   onPromptChange: (v: string) => void;
   onGenerate: () => void;
-  onModelChange: (id: string) => void;
+  onTurnOnSmartOrganizer: () => void;
   onSave: (t: FolderTemplate) => void;
   onSkip?: () => void;
   onCancel?: () => void;
@@ -23,6 +27,7 @@ export type FolderTemplatePickerState = {
 
 export function renderFolderTemplatePicker(state: FolderTemplatePickerState) {
   const selected = state.customTemplate ?? state.selectedTemplate;
+  const isReady = state.smartOrganizerStatus === "ready";
 
   return html`
     <div style="max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px;">
@@ -56,60 +61,51 @@ export function renderFolderTemplatePicker(state: FolderTemplatePickerState) {
         )}
       </div>
 
-      <!-- Describe your structure (Ollama) -->
+      <!-- Custom layout section -->
       <div style="display: flex; flex-direction: column; gap: 8px;">
-        <div style="font-size: 0.8rem; color: var(--muted);">
-          Or describe your ideal folder structure
+        <div>
+          <div style="font-size: 0.85rem; font-weight: 600; color: var(--text);">
+            Custom layout
+            <span style="font-size: 0.75rem; font-weight: 400; color: var(--muted);"> (optional)</span>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--muted); margin-top: 2px;">
+            Describe how you want your project folders organized.
+          </div>
+        </div>
+        <textarea
+          placeholder="RAW in 01 RAW by camera, videos in VIDEO, exports in DELIVERY."
+          .value=${state.smartOrganizerPrompt}
+          @input=${(e: InputEvent) => state.onPromptChange((e.target as HTMLTextAreaElement).value)}
+          ?disabled=${!isReady && state.smartOrganizerStatus !== "not_installed"}
+          rows="2"
+          style="flex: 1; background: var(--secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); font-size: 0.82rem; resize: vertical; font-family: inherit;"
+        ></textarea>
+        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
           ${
-            !state.ollamaAvailable
+            isReady
               ? html`
-                  <span style="font-size: 0.7rem"> (requires Ollama running locally)</span>
-                `
-              : nothing
+                <button
+                  class="btn btn--sm primary"
+                  ?disabled=${!state.smartOrganizerPrompt.trim() || state.smartOrganizerGenerating}
+                  @click=${state.onGenerate}
+                  style="padding: 6px 14px; font-size: 0.82rem;"
+                >${state.smartOrganizerGenerating ? "Creating\u2026" : "Create layout"}</button>
+              `
+              : html`
+                <button
+                  class="btn btn--sm"
+                  @click=${state.onTurnOnSmartOrganizer}
+                  style="padding: 6px 14px; font-size: 0.82rem;"
+                >Turn on Smart Organizer</button>
+              `
           }
-        </div>
-        <div style="display: flex; gap: 6px; align-items: stretch;">
-          <textarea
-            placeholder="e.g. RAW files sorted by camera body, videos in a separate folder, exports for web and print..."
-            .value=${state.ollamaPrompt}
-            @input=${(e: InputEvent) => state.onPromptChange((e.target as HTMLTextAreaElement).value)}
-            ?disabled=${!state.ollamaAvailable}
-            rows="2"
-            style="flex: 1; background: var(--secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); font-size: 0.82rem; resize: vertical; font-family: inherit;"
-          ></textarea>
-        </div>
-        ${
-          state.ollamaAvailable && state.ollamaModels.length > 1
-            ? html`
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 0.75rem; color: var(--muted);">Model:</span>
-              <select
-                .value=${state.ollamaSelectedModel}
-                @change=${(e: Event) => state.onModelChange((e.target as HTMLSelectElement).value)}
-                style="background: var(--secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 8px; color: var(--text); font-size: 0.78rem;"
-              >
-                ${state.ollamaModels.map(
-                  (m) =>
-                    html`<option value=${m} ?selected=${m === state.ollamaSelectedModel}>${m}</option>`,
-                )}
-              </select>
-            </div>
-          `
-            : nothing
-        }
-        <div style="display: flex; gap: 6px; align-items: center;">
-          <button
-            class="btn btn--sm primary"
-            ?disabled=${!state.ollamaAvailable || !state.ollamaPrompt.trim() || state.ollamaGenerating}
-            @click=${state.onGenerate}
-            style="padding: 6px 14px; font-size: 0.82rem;"
-          >${state.ollamaGenerating ? "Generating..." : "Generate"}</button>
           ${
-            state.ollamaError
-              ? html`<span style="font-size: 0.75rem; color: var(--danger);">${state.ollamaError}</span>`
+            state.smartOrganizerError
+              ? html`<span style="font-size: 0.75rem; color: var(--danger);">${state.smartOrganizerError}</span>`
               : nothing
           }
         </div>
+        ${renderDevDetails(state)}
       </div>
 
       <!-- Live preview -->
@@ -122,7 +118,7 @@ export function renderFolderTemplatePicker(state: FolderTemplatePickerState) {
               ${
                 state.customTemplate
                   ? html`
-                      <span style="font-size: 0.7rem"> (AI generated)</span>
+                      <span style="font-size: 0.7rem"> (custom)</span>
                     `
                   : nothing
               }
@@ -153,5 +149,29 @@ export function renderFolderTemplatePicker(state: FolderTemplatePickerState) {
         >Save</button>
       </div>
     </div>
+  `;
+}
+
+/** Dev-only: Show provider details behind a "Show details" toggle. */
+function renderDevDetails(state: FolderTemplatePickerState) {
+  if (!state.developerMode) {
+    return nothing;
+  }
+
+  const statusLabel = state.smartOrganizerStatus;
+  const message = state.smartOrganizerStatusMessage;
+  const provider = state.devProviderInfo;
+
+  return html`
+    <details style="margin-top: 4px;">
+      <summary style="font-size: 0.7rem; color: var(--muted); cursor: pointer; user-select: none;">
+        Show details
+      </summary>
+      <div style="font-size: 0.72rem; color: var(--muted); margin-top: 6px; display: flex; flex-direction: column; gap: 3px; font-family: var(--mono);">
+        <div>Status: <span style="color: var(--text);">${statusLabel}</span></div>
+        ${message ? html`<div>Message: <span style="color: var(--text);">${message}</span></div>` : nothing}
+        ${provider ? html`<div>Provider: <span style="color: var(--text);">${provider}</span></div>` : nothing}
+      </div>
+    </details>
   `;
 }

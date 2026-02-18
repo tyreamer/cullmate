@@ -82,6 +82,7 @@ import { renderSessions } from "./views/sessions.ts";
 import { renderSettingsView } from "./views/settings.ts";
 import { renderSkills } from "./views/skills.ts";
 import { renderStorageSetup } from "./views/storage-setup.ts";
+import { renderStudioManager } from "./views/studio-manager.ts";
 
 const ADVANCED_TABS = new Set<Tab>([
   "overview",
@@ -122,52 +123,44 @@ function resolveAssistantAvatarUrl(state: AppViewState): string | undefined {
 }
 
 export function renderApp(state: AppViewState) {
-  // Gate: show storage setup if no config and not in developer mode
-  const needsStorageSetup = !state.storageConfig && !state.settings.developerMode;
-  if (needsStorageSetup || state.isStorageSetupOpen) {
+  // Gate: show storage setup when explicitly opened (via Studio Manager action card or Settings)
+  if (state.isStorageSetupOpen) {
     return renderStorageSetup({
       primaryDest: state.storageSetupPrimaryDest,
       backupDest: state.storageSetupBackupDest,
       volumes: state.storageSetupVolumes,
       volumesLoading: state.storageSetupVolumesLoading,
       connected: state.connected,
-      editing: state.isStorageSetupOpen && !!state.storageConfig,
+      editing: !!state.storageConfig,
       onPrimaryChange: (path) => state.handleStoragePrimaryChange(path),
       onBackupChange: (path) => state.handleStorageBackupChange(path),
       onPickPrimary: () => void state.handleStoragePickPrimary(),
       onPickBackup: () => void state.handleStoragePickBackup(),
       onSave: (cfg) => state.handleSaveStorageSetup(cfg),
-      onCancel:
-        state.isStorageSetupOpen && state.storageConfig
-          ? () => (state.isStorageSetupOpen = false)
-          : undefined,
+      onCancel: state.storageConfig ? () => (state.isStorageSetupOpen = false) : undefined,
     });
   }
 
-  // Gate: show folder template picker if storage is configured but no template yet
-  const needsFolderTemplate =
-    state.storageConfig && !state.folderTemplate && !state.settings.developerMode;
-  if (needsFolderTemplate || state.isFolderTemplatePickerOpen) {
+  // Gate: show folder template picker when explicitly opened
+  if (state.isFolderTemplatePickerOpen) {
     return renderFolderTemplatePicker({
       presets: ALL_PRESETS,
       selectedTemplate: state.folderTemplatePickerSelected,
       customTemplate: state.folderTemplatePickerCustom,
-      ollamaAvailable: state.folderTemplateOllamaAvailable,
-      ollamaPrompt: state.folderTemplateOllamaPrompt,
-      ollamaGenerating: state.folderTemplateOllamaGenerating,
-      ollamaError: state.folderTemplateOllamaError,
-      ollamaModels: state.folderTemplateOllamaModels,
-      ollamaSelectedModel: state.folderTemplateOllamaSelectedModel,
+      smartOrganizerStatus: state.smartOrganizerStatus,
+      smartOrganizerPrompt: state.smartOrganizerPrompt,
+      smartOrganizerGenerating: state.smartOrganizerGenerating,
+      smartOrganizerError: state.smartOrganizerError,
+      smartOrganizerStatusMessage: state.smartOrganizerStatusMessage,
+      developerMode: state.settings.developerMode,
+      devProviderInfo: state.smartOrganizerDevInfo,
       onSelectPreset: (t) => state.handleSelectFolderTemplatePreset(t),
-      onPromptChange: (v) => (state.folderTemplateOllamaPrompt = v),
-      onGenerate: () => {},
-      onModelChange: (id) => (state.folderTemplateOllamaSelectedModel = id),
+      onPromptChange: (v) => (state.smartOrganizerPrompt = v),
+      onGenerate: () => state.handleSmartOrganizerGenerate(),
+      onTurnOnSmartOrganizer: () => state.handleTurnOnSmartOrganizer(),
       onSave: (t) => state.handleSaveFolderTemplate(t),
-      onSkip: needsFolderTemplate ? () => state.handleSkipFolderTemplate() : undefined,
-      onCancel:
-        state.isFolderTemplatePickerOpen && state.folderTemplate
-          ? () => state.handleCloseFolderTemplatePicker()
-          : undefined,
+      onSkip: !state.folderTemplate ? () => state.handleSkipFolderTemplate() : undefined,
+      onCancel: state.folderTemplate ? () => state.handleCloseFolderTemplatePicker() : undefined,
     });
   }
 
@@ -336,30 +329,38 @@ export function renderApp(state: AppViewState) {
 
         ${
           state.tab === "home"
-            ? renderHome({
-                connected: state.connected,
-                suggestedSources: state.ingestSuggestedSources,
-                recentProjects: state.ingestRecentProjects,
-                onImportClick: () => state.handleIngestOpen(),
-                onSelectSuggestedSource: (s) => state.handleIngestSelectSuggestedSource(s),
-                onSelectRecent: (p) => {
-                  state.ingestSourcePath = p.sourcePath;
-                  state.ingestDestPath = p.destPath;
-                  state.ingestProjectName = p.projectName;
-                  state.handleIngestOpen();
-                },
-                onOpenReport: (p) => {
-                  if (p.reportPath && state.client) {
-                    void openPath(state.client, p.reportPath, p.projectRoot, false).catch(() => {});
-                  }
-                },
-                onRevealProject: (p) => {
-                  if (state.client) {
-                    void openPath(state.client, p.projectRoot, p.destPath, true).catch(() => {});
-                  }
-                },
-                onViewAllProjects: () => state.setTab("projects" as Tab),
-              })
+            ? state.settings.developerMode
+              ? renderHome({
+                  connected: state.connected,
+                  suggestedSources: state.ingestSuggestedSources,
+                  recentProjects: state.ingestRecentProjects,
+                  onImportClick: () => state.handleIngestOpen(),
+                  onSelectSuggestedSource: (s) => state.handleIngestSelectSuggestedSource(s),
+                  onSelectRecent: (p) => {
+                    state.ingestSourcePath = p.sourcePath;
+                    state.ingestDestPath = p.destPath;
+                    state.ingestProjectName = p.projectName;
+                    state.handleIngestOpen();
+                  },
+                  onOpenReport: (p) => {
+                    if (p.reportPath && state.client) {
+                      void openPath(state.client, p.reportPath, p.projectRoot, false).catch(
+                        () => {},
+                      );
+                    }
+                  },
+                  onRevealProject: (p) => {
+                    if (state.client) {
+                      void openPath(state.client, p.projectRoot, p.destPath, true).catch(() => {});
+                    }
+                  },
+                  onViewAllProjects: () => state.setTab("projects" as Tab),
+                })
+              : renderStudioManager({
+                  connected: state.connected,
+                  timeline: state.studioTimeline,
+                  onAction: (action) => state.handleStudioAction(action),
+                })
             : nothing
         }
 

@@ -1,0 +1,239 @@
+/* ===========================================
+   Studio Manager — Timeline UI
+   =========================================== */
+
+.studio-manager {
+  display: flex;
+  flex-direction: column;
+  max-width: 680px;
+  margin: 0 auto;
+  height: 100%;
+  padding: 32px 16px 48px;
+  animation: rise 0.4s var(--ease-out) backwards;
+}
+
+.studio-manager__disconnected {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.studio-manager__timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+/* ── Text bubbles ── */
+
+.studio-msg {
+  display: flex;
+}
+
+.studio-msg--cullmate {
+  justify-content: flex-start;
+}
+
+.studio-msg--you {
+  justify-content: flex-end;
+}
+
+.studio-bubble {
+  max-width: 85%;
+  padding: 14px 18px;
+  border-radius: var(--radius-lg);
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+
+.studio-bubble--cullmate {
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.studio-bubble--you {
+  background: var(--accent-subtle);
+  color: var(--text);
+}
+
+/* ── Action / Status / Result cards ── */
+
+.studio-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.studio-card:hover {
+  border-color: var(--border-strong);
+}
+
+.studio-card--disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.studio-card--done {
+  opacity: 0.7;
+  padding: 14px 18px;
+}
+
+.studio-card--done .studio-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.studio-card__check {
+  color: var(--ok);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.studio-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+  letter-spacing: -0.01em;
+}
+
+.studio-card__desc {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.studio-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.studio-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* ── Progress bar ── */
+
+.studio-card__progress-track {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-hover);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.studio-card__progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.studio-card__progress-fill--indeterminate {
+  width: 40%;
+  animation: studio-progress-indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes studio-progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+
+/* ── Counters ── */
+
+.studio-card__counters {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.studio-card__counter {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.studio-card__counter-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: -0.02em;
+}
+
+.studio-card__counter-label {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Result card variants ── */
+
+.studio-card--result-safe {
+  border-color: var(--ok-muted);
+}
+
+.studio-card--result-unsafe {
+  border-color: var(--danger-muted);
+}
+
+.studio-card__result-banner {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding: 8px 0;
+}
+
+.studio-card__result-banner--safe {
+  color: var(--ok);
+}
+
+.studio-card__result-banner--unsafe {
+  color: var(--danger);
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 700px) {
+  .studio-manager {
+    padding: 20px 12px 32px;
+  }
+
+  .studio-bubble {
+    max-width: 95%;
+  }
+
+  .studio-card__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .studio-card__actions .btn {
+    width: 100%;
+    text-align: center;
+  }
+}

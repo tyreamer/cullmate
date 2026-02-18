@@ -75,6 +75,16 @@ export function handleDisconnected(host: LifecycleHost) {
 }
 
 export function handleUpdated(host: LifecycleHost, changed: Map<PropertyKey, unknown>) {
+  // Rebuild Studio Manager timeline when relevant state changes
+  if (
+    changed.has("ingestSuggestedSources") ||
+    changed.has("ingestRecentProjects") ||
+    changed.has("storageConfig") ||
+    changed.has("folderTemplate")
+  ) {
+    (host as unknown as { rebuildStudioTimeline: () => void }).rebuildStudioTimeline();
+  }
+
   if (host.tab === "chat" && host.chatManualRefreshInFlight) {
     return;
   }

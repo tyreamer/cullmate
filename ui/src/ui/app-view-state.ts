@@ -14,6 +14,7 @@ import type {
 } from "./controllers/ingest.ts";
 import type { SkillMessage } from "./controllers/skills.ts";
 import type { StorageConfig } from "./controllers/storage.ts";
+import type { TimelineEntry } from "./controllers/studio-manager.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
 import type { UiSettings } from "./storage.ts";
@@ -99,12 +100,15 @@ export type AppViewState = {
   isFolderTemplatePickerOpen: boolean;
   folderTemplatePickerSelected: FolderTemplate | null;
   folderTemplatePickerCustom: FolderTemplate | null;
-  folderTemplateOllamaAvailable: boolean;
-  folderTemplateOllamaPrompt: string;
-  folderTemplateOllamaGenerating: boolean;
-  folderTemplateOllamaError: string | null;
-  folderTemplateOllamaModels: string[];
-  folderTemplateOllamaSelectedModel: string;
+  smartOrganizerStatus: import("./controllers/ai-provider.ts").SmartOrganizerStatus;
+  smartOrganizerPrompt: string;
+  smartOrganizerGenerating: boolean;
+  smartOrganizerError: string | null;
+  smartOrganizerStatusMessage: string | null;
+  smartOrganizerDevInfo: string | null;
+  // Studio Manager timeline
+  studioTimeline: TimelineEntry[];
+  handleStudioAction: (action: string) => void;
   // Storage setup state
   storageConfig: StorageConfig | null;
   isStorageSetupOpen: boolean;
@@ -338,6 +342,8 @@ export type AppViewState = {
   handleSelectFolderTemplatePreset: (t: FolderTemplate) => void;
   handleSaveFolderTemplate: (t: FolderTemplate) => void;
   handleSkipFolderTemplate: () => void;
+  handleSmartOrganizerGenerate: () => void;
+  handleTurnOnSmartOrganizer: () => void;
   // Storage setup handlers
   handleOpenStorageSetup: () => void;
   handleSaveStorageSetup: (cfg: StorageConfig) => void;

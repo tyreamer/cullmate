@@ -15,6 +15,7 @@ import type {
   VolumeEntry,
 } from "./controllers/ingest.ts";
 import type { SkillMessage } from "./controllers/skills.ts";
+import type { TimelineEntry } from "./controllers/studio-manager.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
 import type { ResolvedTheme, ThemeMode } from "./theme.ts";
@@ -194,12 +195,13 @@ export class OpenClawApp extends LitElement {
   @state() isFolderTemplatePickerOpen = false;
   @state() folderTemplatePickerSelected: FolderTemplate | null = null;
   @state() folderTemplatePickerCustom: FolderTemplate | null = null;
-  @state() folderTemplateOllamaAvailable = false;
-  @state() folderTemplateOllamaPrompt = "";
-  @state() folderTemplateOllamaGenerating = false;
-  @state() folderTemplateOllamaError: string | null = null;
-  @state() folderTemplateOllamaModels: string[] = [];
-  @state() folderTemplateOllamaSelectedModel = "";
+  @state() smartOrganizerStatus: import("./controllers/ai-provider.ts").SmartOrganizerStatus =
+    "not_installed";
+  @state() smartOrganizerPrompt = "";
+  @state() smartOrganizerGenerating = false;
+  @state() smartOrganizerError: string | null = null;
+  @state() smartOrganizerStatusMessage: string | null = null;
+  @state() smartOrganizerDevInfo: string | null = null;
 
   // Storage setup state
   @state() storageConfig: StorageConfig | null = loadStorageConfig();
@@ -208,6 +210,9 @@ export class OpenClawApp extends LitElement {
   @state() storageSetupVolumesLoading = false;
   @state() storageSetupPrimaryDest = "";
   @state() storageSetupBackupDest = "";
+
+  // Studio Manager timeline
+  @state() studioTimeline: TimelineEntry[] = [];
 
   @state() nodesLoading = false;
   @state() nodes: Array<Record<string, unknown>> = [];
@@ -601,11 +606,7 @@ export class OpenClawApp extends LitElement {
   // Ingest handlers
   /** Called after gateway connects to open deferred modals from URL params. */
   consumePendingModal() {
-    // If no storage config, load volumes for the first-run setup screen
-    // (without resetting any user-entered paths — handleOpenStorageSetup resets them)
-    if (!this.storageConfig && !this.settings.developerMode) {
-      this.loadStorageSetupVolumes();
-    }
+    this.rebuildStudioTimeline();
     if (!this.pendingModalIngest) {
       return;
     }
@@ -825,11 +826,11 @@ export class OpenClawApp extends LitElement {
     this.isFolderTemplatePickerOpen = true;
     this.folderTemplatePickerSelected = this.folderTemplate ?? ALL_PRESETS[0];
     this.folderTemplatePickerCustom = null;
-    this.folderTemplateOllamaPrompt = "";
-    this.folderTemplateOllamaError = null;
-    this.folderTemplateOllamaGenerating = false;
-    // Check Ollama availability in background
-    void this.checkOllamaAvailability();
+    this.smartOrganizerPrompt = "";
+    this.smartOrganizerError = null;
+    this.smartOrganizerGenerating = false;
+    // Check Smart Organizer availability in background
+    void this.checkSmartOrganizerStatus();
   }
 
   handleCloseFolderTemplatePicker() {
@@ -854,40 +855,74 @@ export class OpenClawApp extends LitElement {
     this.isFolderTemplatePickerOpen = false;
   }
 
-  async checkOllamaAvailability() {
+  async checkSmartOrganizerStatus() {
     try {
-      const { checkOllamaAvailability } = await import("./controllers/ollama-check.ts");
-      const status = await checkOllamaAvailability();
-      this.folderTemplateOllamaAvailable = status.available;
-      this.folderTemplateOllamaModels = status.models;
-      if (status.models.length > 0 && !this.folderTemplateOllamaSelectedModel) {
-        this.folderTemplateOllamaSelectedModel = status.models[0];
-      }
+      const { createAIProvider } = await import("./controllers/ai-provider-factory.ts");
+      const provider = createAIProvider({
+        developerMode: this.settings.developerMode,
+        client: this.client,
+      });
+      const result = await provider.status();
+      this.smartOrganizerStatus = result.status;
+      this.smartOrganizerStatusMessage = result.message ?? null;
+      this.smartOrganizerDevInfo = result._dev
+        ? `${result._dev.provider}${result._dev.endpoint ? ` (${result._dev.endpoint})` : ""}`
+        : null;
     } catch {
-      this.folderTemplateOllamaAvailable = false;
+      this.smartOrganizerStatus = "error";
+      this.smartOrganizerStatusMessage = "Could not check availability.";
     }
   }
 
-  async handleGenerateTemplateFromPrompt() {
-    if (!this.client || !this.folderTemplateOllamaPrompt.trim()) {
+  async handleSmartOrganizerGenerate() {
+    if (!this.smartOrganizerPrompt.trim()) {
       return;
     }
-    this.folderTemplateOllamaGenerating = true;
-    this.folderTemplateOllamaError = null;
+    this.smartOrganizerGenerating = true;
+    this.smartOrganizerError = null;
     try {
-      const response = await this.client.request<{ template: FolderTemplate }>(
-        "photo.generate_template",
-        {
-          prompt: this.folderTemplateOllamaPrompt.trim(),
-          model_id: this.folderTemplateOllamaSelectedModel || undefined,
-        },
-      );
-      this.folderTemplatePickerCustom = response.template;
-      this.folderTemplatePickerSelected = null;
-    } catch (err) {
-      this.folderTemplateOllamaError = err instanceof Error ? err.message : String(err);
+      const { createAIProvider } = await import("./controllers/ai-provider-factory.ts");
+      const { FOLDER_TEMPLATE_JSON_SCHEMA } =
+        await import("./controllers/folder-templates/schema.ts");
+      const provider = createAIProvider({
+        developerMode: this.settings.developerMode,
+        client: this.client,
+      });
+      const result = await provider.generateTemplate({
+        prompt: this.smartOrganizerPrompt.trim(),
+        presets: ALL_PRESETS.map((p) => ({
+          id: p.template_id,
+          title: p.name,
+          description: p.description,
+          exampleTree: p.routing_rules.map((r) => r.dest_pattern).join(", "),
+        })),
+        schema: FOLDER_TEMPLATE_JSON_SCHEMA,
+      });
+      if (result.ok) {
+        this.folderTemplatePickerCustom = result.template;
+        this.folderTemplatePickerSelected = null;
+      } else {
+        this.smartOrganizerError = result.error;
+      }
+    } catch {
+      this.smartOrganizerError = "Could not create layout. Please try again.";
     } finally {
-      this.folderTemplateOllamaGenerating = false;
+      this.smartOrganizerGenerating = false;
+    }
+  }
+
+  handleTurnOnSmartOrganizer() {
+    if (this.settings.developerMode) {
+      // In dev mode, re-check status
+      this.smartOrganizerError = null;
+      void this.checkSmartOrganizerStatus().then(() => {
+        if (this.smartOrganizerStatus !== "ready") {
+          this.smartOrganizerError = "Smart Organizer is not running. Please try again.";
+        }
+      });
+    } else {
+      // Normal mode: coming soon
+      this.smartOrganizerError = "Coming soon.";
     }
   }
 
@@ -1002,6 +1037,57 @@ export class OpenClawApp extends LitElement {
     const newRatio = Math.max(0.4, Math.min(0.7, ratio));
     this.splitRatio = newRatio;
     this.applySettings({ ...this.settings, splitRatio: newRatio });
+  }
+
+  // Studio Manager
+
+  handleStudioAction(action: string) {
+    switch (action) {
+      case "open-storage-setup":
+        this.handleOpenStorageSetup();
+        break;
+      case "open-template-picker":
+      case "open-template-describe":
+        this.handleOpenFolderTemplatePicker();
+        break;
+      case "open-import":
+        void this.handleIngestOpen();
+        break;
+      case "import-detected":
+        if (this.ingestSuggestedSources.length > 0) {
+          this.handleIngestSelectSuggestedSource(this.ingestSuggestedSources[0]);
+        }
+        break;
+      case "dismiss-detected":
+        this.studioTimeline = this.studioTimeline.filter(
+          (e) => e.id !== "detected-source" && e.id !== "import-detected",
+        );
+        break;
+      case "view-projects":
+        this.setTab("projects" as Tab);
+        break;
+      default:
+        if (action.startsWith("open-recent:")) {
+          const root = action.slice("open-recent:".length);
+          if (this.client) {
+            void import("./controllers/ingest.ts").then(({ openPath: op }) => {
+              void op(this.client!, root, root, true).catch(() => {});
+            });
+          }
+        }
+        break;
+    }
+  }
+
+  rebuildStudioTimeline() {
+    void import("./controllers/studio-manager.ts").then(({ buildStarterTimeline }) => {
+      this.studioTimeline = buildStarterTimeline({
+        suggestedSources: this.ingestSuggestedSources,
+        recentProjects: this.ingestRecentProjects,
+        hasStorageConfig: !!this.storageConfig,
+        hasFolderTemplate: !!this.folderTemplate,
+      });
+    });
   }
 
   render() {
