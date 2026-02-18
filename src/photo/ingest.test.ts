@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { FolderTemplate } from "./folder-template.js";
 import type { IngestManifest, IngestProgressEvent } from "./types.js";
 import { runIngest } from "./ingest.js";
 
@@ -367,5 +368,354 @@ describe("ingest integration", () => {
 
     expect(manifest.totals.success_count).toBe(5);
     expect(manifest.project_root).toBe(path.join(freshDest, "TildeTest"));
+  });
+
+  it("copies to backup and sets safe_to_format=true", async () => {
+    const freshDest = path.join(tmpDir, "output-backup");
+    const backupDest = path.join(tmpDir, "backup");
+    const events: IngestProgressEvent[] = [];
+
+    const manifest = await runIngest(
+      {
+        source_path: sourceDir,
+        dest_project_path: freshDest,
+        project_name: "BackupTest",
+        verify_mode: "sentinel",
+        overwrite: false,
+        hash_algo: "sha256",
+        backup_dest: backupDest,
+      },
+      (event) => events.push(event),
+    );
+
+    // Primary copy succeeded
+    expect(manifest.totals.success_count).toBe(5);
+    expect(manifest.totals.fail_count).toBe(0);
+
+    // Backup copy succeeded
+    expect(manifest.totals.backup_success_count).toBe(5);
+    expect(manifest.totals.backup_fail_count).toBe(0);
+
+    // Backup verification passed
+    expect(manifest.totals.backup_verified_count).toBe(5);
+    expect(manifest.totals.backup_verified_ok).toBe(5);
+    expect(manifest.totals.backup_verified_mismatch).toBe(0);
+
+    // Safe to format!
+    expect(manifest.safe_to_format).toBe(true);
+
+    // Backup dest and root are set in manifest
+    expect(manifest.backup_dest).toBe(backupDest);
+    expect(manifest.backup_root).toBe(path.join(backupDest, "BackupTest", "01_RAW"));
+
+    // Backup files actually exist on disk
+    const backupImg = await fs.readFile(
+      path.join(backupDest, "BackupTest", "01_RAW", "day1", "IMG_001.jpg"),
+      "utf-8",
+    );
+    expect(backupImg).toBe("fake-jpg-data-1");
+
+    // Backup project structure created
+    await expect(fs.stat(path.join(backupDest, "BackupTest", "02_EXPORTS"))).resolves.toBeTruthy();
+
+    // File entries have backup fields
+    const copied = manifest.files.filter((f) => f.status === "copied");
+    for (const f of copied) {
+      expect(f.backup_status).toBe("copied");
+      expect(f.backup_hash).toMatch(/^[0-9a-f]{64}$/);
+      expect(f.backup_verified).toBe(true);
+    }
+
+    // Backup progress events emitted
+    const eventTypes = events.map((e) => e.type);
+    expect(eventTypes).toContain("ingest.backup.start");
+    expect(eventTypes).toContain("ingest.backup.copy.progress");
+    expect(eventTypes).toContain("ingest.backup.verify.progress");
+
+    // Done event includes safe_to_format
+    const doneEvent = events.find((e) => e.type === "ingest.done");
+    expect(doneEvent).toBeTruthy();
+    if (doneEvent?.type === "ingest.done") {
+      expect(doneEvent.safe_to_format).toBe(true);
+    }
+
+    // Report HTML contains safe-to-format banner
+    const reportHtml = await fs.readFile(manifest.report_path!, "utf-8");
+    expect(reportHtml).toContain("Safe to Format Cards: YES");
+    expect(reportHtml).toContain("backup");
+  });
+
+  it("sets safe_to_format=false when no backup provided", async () => {
+    const freshDest = path.join(tmpDir, "output-no-backup");
+
+    const manifest = await runIngest({
+      source_path: sourceDir,
+      dest_project_path: freshDest,
+      project_name: "NoBackupTest",
+      verify_mode: "none",
+      overwrite: false,
+      hash_algo: "sha256",
+    });
+
+    expect(manifest.totals.success_count).toBe(5);
+    expect(manifest.safe_to_format).toBe(false);
+    expect(manifest.backup_dest).toBeUndefined();
+    expect(manifest.backup_root).toBeUndefined();
+
+    // Report warns about no backup
+    const reportHtml = await fs.readFile(manifest.report_path!, "utf-8");
+    expect(reportHtml).toContain("No Backup Configured");
+  });
+
+  it("copies to backup with verify_mode=none", async () => {
+    const freshDest = path.join(tmpDir, "output-backup-noverify");
+    const backupDest = path.join(tmpDir, "backup-noverify");
+
+    const manifest = await runIngest({
+      source_path: sourceDir,
+      dest_project_path: freshDest,
+      project_name: "BackupNoVerify",
+      verify_mode: "none",
+      overwrite: false,
+      hash_algo: "sha256",
+      backup_dest: backupDest,
+    });
+
+    // Primary and backup copies succeeded
+    expect(manifest.totals.success_count).toBe(5);
+    expect(manifest.totals.backup_success_count).toBe(5);
+
+    // No verification done (verify_mode=none)
+    expect(manifest.totals.verified_count).toBe(0);
+    expect(manifest.totals.backup_verified_count).toBe(0);
+
+    // Still safe to format (no failures, no mismatches)
+    expect(manifest.safe_to_format).toBe(true);
+  });
+
+  // ── Template routing tests ──
+
+  it("routes files to media-type folders with media-split template", async () => {
+    const freshDest = path.join(tmpDir, "output-media-split");
+    const template: FolderTemplate = {
+      template_id: "preset:media-split",
+      name: "Media Split",
+      description: "Split by media type",
+      is_preset: true,
+      routing_rules: [
+        { label: "RAW files", match: { media_type: "RAW" }, dest_pattern: "RAW" },
+        { label: "Video files", match: { media_type: "VIDEO" }, dest_pattern: "VIDEO" },
+        { label: "Other files", dest_pattern: "PHOTO" },
+      ],
+      scaffold_dirs: ["EXPORTS", "DELIVERY"],
+      token_defaults: {},
+    };
+
+    const manifest = await runIngest({
+      source_path: sourceDir,
+      dest_project_path: freshDest,
+      project_name: "MediaSplitTest",
+      verify_mode: "none",
+      overwrite: false,
+      hash_algo: "sha256",
+      folder_template: template,
+    });
+
+    const projectRoot = path.join(freshDest, "MediaSplitTest");
+
+    // All files should be copied
+    expect(manifest.totals.success_count).toBe(5);
+    expect(manifest.template_id).toBe("preset:media-split");
+
+    // RAW files (.nef, .cr2) should be in RAW/
+    const nefEntry = manifest.files.find((f) => f.src_rel.endsWith("DSC_002.nef"));
+    expect(nefEntry?.dst_rel).toContain("RAW/");
+    expect(nefEntry?.routed_by).toBe("RAW files");
+
+    const cr2Entry = manifest.files.find((f) => f.src_rel.endsWith("IMG_004.cr2"));
+    expect(cr2Entry?.dst_rel).toContain("RAW/");
+
+    // Video file (.mov) should be in VIDEO/
+    const movEntry = manifest.files.find((f) => f.src_rel.endsWith("MOV_003.mov"));
+    expect(movEntry?.dst_rel).toContain("VIDEO/");
+    expect(movEntry?.routed_by).toBe("Video files");
+
+    // Photo files (.jpg, .png) should be in PHOTO/
+    const jpgEntry = manifest.files.find((f) => f.src_rel.endsWith("IMG_001.jpg"));
+    expect(jpgEntry?.dst_rel).toContain("PHOTO/");
+    expect(jpgEntry?.routed_by).toBe("Other files");
+
+    // Verify files exist on disk in correct locations
+    await expect(fs.stat(path.join(projectRoot, nefEntry!.dst_rel))).resolves.toBeTruthy();
+    await expect(fs.stat(path.join(projectRoot, movEntry!.dst_rel))).resolves.toBeTruthy();
+
+    // Scaffold dirs created (not 01_RAW, 02_EXPORTS, 03_DELIVERY)
+    await expect(fs.stat(path.join(projectRoot, "EXPORTS"))).resolves.toBeTruthy();
+    await expect(fs.stat(path.join(projectRoot, "DELIVERY"))).resolves.toBeTruthy();
+    await expect(fs.stat(path.join(projectRoot, ".cullmate"))).resolves.toBeTruthy();
+
+    // Legacy dirs should NOT exist
+    await expect(fs.stat(path.join(projectRoot, "01_RAW"))).rejects.toThrow();
+    await expect(fs.stat(path.join(projectRoot, "02_EXPORTS"))).rejects.toThrow();
+  });
+
+  it("uses date tokens from import date when no EXIF", async () => {
+    const freshDest = path.join(tmpDir, "output-date-template");
+    const template: FolderTemplate = {
+      template_id: "preset:date-organized",
+      name: "Date Organized",
+      description: "By date",
+      is_preset: true,
+      routing_rules: [{ label: "All by date", dest_pattern: "{YYYY}/{MM}-{DD}" }],
+      scaffold_dirs: ["EXPORTS"],
+      token_defaults: {},
+    };
+
+    const manifest = await runIngest({
+      source_path: sourceDir,
+      dest_project_path: freshDest,
+      project_name: "DateTest",
+      verify_mode: "none",
+      overwrite: false,
+      hash_algo: "sha256",
+      folder_template: template,
+    });
+
+    expect(manifest.totals.success_count).toBe(5);
+
+    // All files should have a date-based path (using import date since files have no EXIF)
+    const now = new Date();
+    const yyyy = String(now.getFullYear());
+    for (const file of manifest.files) {
+      expect(file.dst_rel).toContain(yyyy);
+    }
+  });
+
+  it("creates scaffold dirs even with no files routed there", async () => {
+    const freshDest = path.join(tmpDir, "output-scaffold");
+    const template: FolderTemplate = {
+      template_id: "test:scaffold",
+      name: "Scaffold Test",
+      description: "Testing scaffold dirs",
+      is_preset: false,
+      routing_rules: [{ label: "All", dest_pattern: "ALL_FILES" }],
+      scaffold_dirs: ["EXPORTS/web", "EXPORTS/print", "DELIVERY"],
+      token_defaults: {},
+    };
+
+    await runIngest({
+      source_path: sourceDir,
+      dest_project_path: freshDest,
+      project_name: "ScaffoldTest",
+      verify_mode: "none",
+      overwrite: false,
+      hash_algo: "sha256",
+      folder_template: template,
+    });
+
+    const projectRoot = path.join(freshDest, "ScaffoldTest");
+    await expect(fs.stat(path.join(projectRoot, "EXPORTS/web"))).resolves.toBeTruthy();
+    await expect(fs.stat(path.join(projectRoot, "EXPORTS/print"))).resolves.toBeTruthy();
+    await expect(fs.stat(path.join(projectRoot, "DELIVERY"))).resolves.toBeTruthy();
+  });
+
+  it("falls back to classic behavior when no template", async () => {
+    const freshDest = path.join(tmpDir, "output-no-template");
+
+    const manifest = await runIngest({
+      source_path: sourceDir,
+      dest_project_path: freshDest,
+      project_name: "ClassicTest",
+      verify_mode: "none",
+      overwrite: false,
+      hash_algo: "sha256",
+    });
+
+    expect(manifest.totals.success_count).toBe(5);
+    expect(manifest.template_id).toBeUndefined();
+
+    // All files should be under 01_RAW/
+    for (const file of manifest.files) {
+      expect(file.dst_rel.startsWith("01_RAW/")).toBe(true);
+    }
+
+    const projectRoot = path.join(freshDest, "ClassicTest");
+    await expect(fs.stat(path.join(projectRoot, "01_RAW"))).resolves.toBeTruthy();
+    await expect(fs.stat(path.join(projectRoot, "02_EXPORTS"))).resolves.toBeTruthy();
+    await expect(fs.stat(path.join(projectRoot, "03_DELIVERY"))).resolves.toBeTruthy();
+  });
+
+  it("backup mirrors template structure", async () => {
+    const freshDest = path.join(tmpDir, "output-template-backup");
+    const backupDest = path.join(tmpDir, "backup-template");
+    const template: FolderTemplate = {
+      template_id: "preset:media-split",
+      name: "Media Split",
+      description: "Split by media type",
+      is_preset: true,
+      routing_rules: [
+        { label: "RAW files", match: { media_type: "RAW" }, dest_pattern: "RAW" },
+        { label: "Video files", match: { media_type: "VIDEO" }, dest_pattern: "VIDEO" },
+        { label: "Other files", dest_pattern: "PHOTO" },
+      ],
+      scaffold_dirs: ["EXPORTS"],
+      token_defaults: {},
+    };
+
+    const manifest = await runIngest({
+      source_path: sourceDir,
+      dest_project_path: freshDest,
+      project_name: "BackupTemplateTest",
+      verify_mode: "sentinel",
+      overwrite: false,
+      hash_algo: "sha256",
+      backup_dest: backupDest,
+      folder_template: template,
+    });
+
+    expect(manifest.totals.success_count).toBe(5);
+    expect(manifest.totals.backup_success_count).toBe(5);
+    expect(manifest.safe_to_format).toBe(true);
+
+    // Verify backup files mirror the template structure
+    const nefEntry = manifest.files.find((f) => f.src_rel.endsWith("DSC_002.nef"));
+    const backupNefPath = path.join(backupDest, "BackupTemplateTest", nefEntry!.dst_rel);
+    await expect(fs.stat(backupNefPath)).resolves.toBeTruthy();
+
+    // Backup scaffold dirs created
+    await expect(
+      fs.stat(path.join(backupDest, "BackupTemplateTest", "EXPORTS")),
+    ).resolves.toBeTruthy();
+  });
+
+  it("stores template_id in manifest", async () => {
+    const freshDest = path.join(tmpDir, "output-template-id");
+    const template: FolderTemplate = {
+      template_id: "custom:abc123",
+      name: "Custom Template",
+      description: "Testing template_id",
+      is_preset: false,
+      routing_rules: [{ label: "All", dest_pattern: "FILES" }],
+      scaffold_dirs: [],
+      token_defaults: {},
+    };
+
+    const manifest = await runIngest({
+      source_path: sourceDir,
+      dest_project_path: freshDest,
+      project_name: "TemplateIdTest",
+      verify_mode: "none",
+      overwrite: false,
+      hash_algo: "sha256",
+      folder_template: template,
+    });
+
+    expect(manifest.template_id).toBe("custom:abc123");
+
+    // Verify it's in the written manifest JSON too
+    const manifestJson = JSON.parse(
+      await fs.readFile(manifest.manifest_path!, "utf-8"),
+    ) as IngestManifest;
+    expect(manifestJson.template_id).toBe("custom:abc123");
   });
 });

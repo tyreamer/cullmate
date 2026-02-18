@@ -1,3 +1,5 @@
+import type { FolderTemplate, MediaType } from "./folder-template.js";
+
 export type VerifyMode = "none" | "sentinel" | "full";
 
 export type IngestParams = {
@@ -8,6 +10,9 @@ export type IngestParams = {
   overwrite: boolean;
   hash_algo: string; // "blake3" | "sha256" | "sha512"
   dedupe?: boolean;
+  backup_dest?: string; // backup destination parent directory
+  folder_template?: FolderTemplate;
+  template_context?: Record<string, string>; // user-provided: CLIENT, JOB, etc.
 };
 
 export type FileStatus = "copied" | "skipped_exists" | "skipped_duplicate" | "error";
@@ -22,6 +27,14 @@ export type FileEntry = {
   duplicate_of?: string; // dst_rel of the first copy (when status=skipped_duplicate)
   error?: string;
   verified?: boolean; // true=match, false=mismatch, undefined=not checked
+  media_type?: MediaType;
+  routed_by?: string; // label of matching routing rule
+  // Backup copy fields (only present when backup_dest is set)
+  backup_status?: FileStatus;
+  backup_hash?: string; // hex digest from backup copy pass
+  backup_hash_dest?: string; // hex digest from backup verification pass
+  backup_verified?: boolean;
+  backup_error?: string;
 };
 
 export type IngestManifest = {
@@ -37,6 +50,10 @@ export type IngestManifest = {
   finished_at: string;
   manifest_path?: string;
   report_path?: string;
+  backup_dest?: string; // backup parent directory
+  backup_root?: string; // backup 01_RAW/ absolute path
+  template_id?: string;
+  safe_to_format: boolean;
   totals: {
     file_count: number;
     success_count: number;
@@ -48,6 +65,11 @@ export type IngestManifest = {
     verified_count: number;
     verified_ok: number;
     verified_mismatch: number;
+    backup_success_count: number;
+    backup_fail_count: number;
+    backup_verified_count: number;
+    backup_verified_ok: number;
+    backup_verified_mismatch: number;
   };
   files: FileEntry[];
 };
@@ -77,6 +99,21 @@ export type IngestProgressEvent =
       verified_count: number;
       verified_total: number;
     }
+  | { type: "ingest.backup.start"; backup_root: string }
+  | {
+      type: "ingest.backup.copy.progress";
+      index: number;
+      total: number;
+      rel_path: string;
+      bytes_copied: number;
+      total_bytes_copied: number;
+    }
+  | {
+      type: "ingest.backup.verify.progress";
+      mode: VerifyMode;
+      verified_count: number;
+      verified_total: number;
+    }
   | {
       type: "ingest.report.generated";
       manifest_path: string;
@@ -87,6 +124,7 @@ export type IngestProgressEvent =
       success_count: number;
       fail_count: number;
       elapsed_ms: number;
+      safe_to_format: boolean;
     };
 
 export type OnProgress = (event: IngestProgressEvent) => void;

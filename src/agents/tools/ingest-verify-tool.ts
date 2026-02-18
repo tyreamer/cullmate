@@ -1,5 +1,6 @@
 import type { AgentToolResult } from "@mariozechner/pi-agent-core";
 import { Type } from "@sinclair/typebox";
+import type { FolderTemplate } from "../../photo/folder-template.js";
 import type { IngestProgressEvent, OnProgress, VerifyMode } from "../../photo/types.js";
 import type { AnyAgentTool } from "./common.js";
 import { runIngest } from "../../photo/ingest.js";
@@ -36,6 +37,23 @@ const IngestVerifySchema = Type.Object({
       description: "If true, skip duplicate files based on content hash",
     }),
   ),
+  backup_dest: Type.Optional(
+    Type.String({
+      description:
+        "Backup destination parent directory. When set, files are copied to both primary and backup with safe_to_format verification.",
+    }),
+  ),
+  folder_template: Type.Optional(
+    Type.Unsafe<FolderTemplate>({
+      description:
+        "Folder template JSON object for routing files into subfolders. When omitted, uses the classic 01_RAW/ structure.",
+    }),
+  ),
+  template_context: Type.Optional(
+    Type.Record(Type.String(), Type.String(), {
+      description: "User-provided token values for template expansion (e.g. CLIENT, JOB).",
+    }),
+  ),
 });
 
 export function createIngestVerifyTool(): AnyAgentTool {
@@ -65,6 +83,16 @@ export function createIngestVerifyTool(): AnyAgentTool {
       const overwrite = typeof args.overwrite === "boolean" ? args.overwrite : false;
       const hashAlgo = typeof args.hash_algo === "string" ? args.hash_algo : "sha256";
       const dedupe = typeof args.dedupe === "boolean" ? args.dedupe : false;
+      const backupDest =
+        typeof args.backup_dest === "string" ? args.backup_dest.trim() || undefined : undefined;
+      const folderTemplate =
+        args.folder_template && typeof args.folder_template === "object"
+          ? (args.folder_template as FolderTemplate)
+          : undefined;
+      const templateContext =
+        args.template_context && typeof args.template_context === "object"
+          ? (args.template_context as Record<string, string>)
+          : undefined;
 
       const progressCallback: OnProgress | undefined = onUpdate
         ? (event: IngestProgressEvent) => {
@@ -81,6 +109,9 @@ export function createIngestVerifyTool(): AnyAgentTool {
           overwrite,
           hash_algo: hashAlgo,
           dedupe,
+          backup_dest: backupDest,
+          folder_template: folderTemplate,
+          template_context: templateContext,
         },
         progressCallback,
       );
@@ -90,6 +121,7 @@ export function createIngestVerifyTool(): AnyAgentTool {
         project_root: manifest.project_root,
         manifest_path: manifest.manifest_path,
         report_path: manifest.report_path,
+        safe_to_format: manifest.safe_to_format,
         totals: manifest.totals,
       });
     },
