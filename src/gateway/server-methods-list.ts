@@ -93,6 +93,7 @@ const BASE_METHODS = [
   "tools.invoke",
   "system.pick_folder",
   "system.list_volumes",
+  "photo.generate_template",
 ];
 
 export function listGatewayMethods(): string[] {
