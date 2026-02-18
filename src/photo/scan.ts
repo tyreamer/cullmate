@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import type { MediaType } from "./folder-template.js";
 import type { OnProgress } from "./types.js";
 
 /**
@@ -18,8 +19,7 @@ export function suggestProjectName(sourcePath: string): string {
   return `${ymd}_${sanitized}`;
 }
 
-const MEDIA_EXTENSIONS = new Set([
-  // RAW
+const RAW_EXTENSIONS = new Set([
   ".cr2",
   ".cr3",
   ".nef",
@@ -30,22 +30,33 @@ const MEDIA_EXTENSIONS = new Set([
   ".orf",
   ".pef",
   ".srw",
-  // IMG
-  ".jpg",
-  ".jpeg",
-  ".png",
-  ".heic",
-  ".tif",
-  ".tiff",
-  // VID
-  ".mp4",
-  ".mov",
 ]);
+
+const PHOTO_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".heic", ".tif", ".tiff"]);
+
+const VIDEO_EXTENSIONS = new Set([".mp4", ".mov"]);
+
+const MEDIA_EXTENSIONS = new Set([...RAW_EXTENSIONS, ...PHOTO_EXTENSIONS, ...VIDEO_EXTENSIONS]);
+
+/**
+ * Classify a file extension into a MediaType.
+ */
+export function classifyMediaType(ext: string): MediaType {
+  const lower = ext.toLowerCase();
+  if (RAW_EXTENSIONS.has(lower)) {
+    return "RAW";
+  }
+  if (VIDEO_EXTENSIONS.has(lower)) {
+    return "VIDEO";
+  }
+  return "PHOTO";
+}
 
 export type ScannedFile = {
   rel_path: string;
   abs_path: string;
   size: number;
+  media_type: MediaType;
 };
 
 export async function scanSourceFiles(
@@ -80,6 +91,7 @@ export async function scanSourceFiles(
       rel_path: relPath,
       abs_path: absPath,
       size: stat.size,
+      media_type: classifyMediaType(ext),
     });
 
     if (onProgress && files.length % 100 === 0) {
