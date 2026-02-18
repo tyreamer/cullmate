@@ -1,3 +1,4 @@
+import type { FolderTemplate } from "../../../src/photo/folder-template.js";
 import type { EventLogEntry } from "./app-events.ts";
 import type { CompactionStatus } from "./app-tool-stream.ts";
 import type { DevicePairingList } from "./controllers/devices.ts";
@@ -93,6 +94,17 @@ export type AppViewState = {
   ingestDedupeEnabled: boolean;
   ingestRecentProjects: RecentProject[];
   ingestSuggestedSources: SuggestedSource[];
+  // Folder template state
+  folderTemplate: FolderTemplate | null;
+  isFolderTemplatePickerOpen: boolean;
+  folderTemplatePickerSelected: FolderTemplate | null;
+  folderTemplatePickerCustom: FolderTemplate | null;
+  folderTemplateOllamaAvailable: boolean;
+  folderTemplateOllamaPrompt: string;
+  folderTemplateOllamaGenerating: boolean;
+  folderTemplateOllamaError: string | null;
+  folderTemplateOllamaModels: string[];
+  folderTemplateOllamaSelectedModel: string;
   // Storage setup state
   storageConfig: StorageConfig | null;
   isStorageSetupOpen: boolean;
@@ -320,7 +332,17 @@ export type AppViewState = {
   handleIngestPickSource: () => Promise<void>;
   handleIngestPickDest: () => Promise<void>;
   handleIngestSelectSuggestedSource: (s: SuggestedSource) => void;
+  // Folder template handlers
+  handleOpenFolderTemplatePicker: () => void;
+  handleCloseFolderTemplatePicker: () => void;
+  handleSelectFolderTemplatePreset: (t: FolderTemplate) => void;
+  handleSaveFolderTemplate: (t: FolderTemplate) => void;
+  handleSkipFolderTemplate: () => void;
   // Storage setup handlers
   handleOpenStorageSetup: () => void;
   handleSaveStorageSetup: (cfg: StorageConfig) => void;
+  handleStoragePickPrimary: () => Promise<void>;
+  handleStoragePickBackup: () => Promise<void>;
+  handleStoragePrimaryChange: (path: string) => void;
+  handleStorageBackupChange: (path: string) => void;
 };

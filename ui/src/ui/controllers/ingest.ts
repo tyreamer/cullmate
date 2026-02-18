@@ -1,3 +1,4 @@
+import type { FolderTemplate } from "../../../../src/photo/folder-template.js";
 import type { GatewayBrowserClient } from "../gateway.ts";
 
 export type IngestStage = "idle" | "prompting" | "running" | "done" | "error";
@@ -58,6 +59,7 @@ export type IngestResult = {
   project_root?: string;
   manifest_path?: string;
   report_path?: string;
+  safe_to_format?: boolean;
   totals?: {
     file_count: number;
     success_count: number;
@@ -67,6 +69,11 @@ export type IngestResult = {
     verified_count: number;
     verified_ok: number;
     verified_mismatch: number;
+    backup_success_count: number;
+    backup_fail_count: number;
+    backup_verified_count: number;
+    backup_verified_ok: number;
+    backup_verified_mismatch: number;
   };
 };
 
@@ -80,6 +87,9 @@ export async function runIngestVerify(
     hash_algo: string;
     overwrite: boolean;
     dedupe?: boolean;
+    backup_dest?: string;
+    folder_template?: FolderTemplate;
+    template_context?: Record<string, string>;
   },
 ): Promise<IngestResult> {
   const response = await client.request<{

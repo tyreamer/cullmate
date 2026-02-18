@@ -1,4 +1,5 @@
 import { html, nothing } from "lit";
+import type { FolderTemplate } from "../../../../src/photo/folder-template.js";
 import type {
   IngestProgress,
   IngestResult,
@@ -21,6 +22,7 @@ export type IngestViewState = {
   connected: boolean;
   recentProjects: RecentProject[];
   suggestedSources: SuggestedSource[];
+  folderTemplate: FolderTemplate | null;
   onSourcePathChange: (v: string) => void;
   onDestPathChange: (v: string) => void;
   onProjectNameChange: (v: string) => void;
@@ -30,6 +32,7 @@ export type IngestViewState = {
   onPickSource: () => void;
   onPickDest: () => void;
   onChangeStorage?: () => void;
+  onChangeFolderTemplate?: () => void;
   onSelectSuggestedSource: (s: SuggestedSource) => void;
   onStart: () => void;
   onClose: () => void;
@@ -102,6 +105,16 @@ function progressLabel(p: IngestProgress | null): string {
     }
     case "ingest.verify.progress":
       return `Verifying integrity... (${p.verified_count ?? 0} of ${p.verified_total ?? 0})`;
+    case "ingest.backup.start":
+      return "Starting backup copy...";
+    case "ingest.backup.copy.progress": {
+      const filename = p.rel_path
+        ? truncateFilename(p.rel_path.split("/").pop() ?? p.rel_path)
+        : "";
+      return `Backup: copying file ${p.index} of ${p.total} \u2014 ${filename}`;
+    }
+    case "ingest.backup.verify.progress":
+      return `Verifying backup... (${p.verified_count ?? 0} of ${p.verified_total ?? 0})`;
     case "ingest.report.generated":
       return "Writing receipt...";
     case "ingest.done": {
@@ -118,6 +131,9 @@ function progressPercent(p: IngestProgress | null): number {
     return 0;
   }
   if (p.type === "ingest.copy.progress" && p.total) {
+    return Math.round(((p.index ?? 0) / p.total) * 100);
+  }
+  if (p.type === "ingest.backup.copy.progress" && p.total) {
     return Math.round(((p.index ?? 0) / p.total) * 100);
   }
   if (p.type === "ingest.done") {
@@ -287,6 +303,29 @@ function renderPromptForm(state: IngestViewState) {
           style="background: var(--secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); font-size: 0.85rem;"
         />
       </label>
+      ${
+        state.folderTemplate
+          ? html`
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 0.78rem; color: var(--muted);">Structure:</span>
+            <span
+              style="display: inline-flex; align-items: center; gap: 4px; background: var(--secondary); border: 1px solid var(--border); border-radius: 999px; padding: 2px 10px; font-size: 0.78rem;"
+            >
+              <span style="font-weight: 500;">${state.folderTemplate.name}</span>
+            </span>
+            ${
+              state.onChangeFolderTemplate
+                ? html`<button
+                  class="btn btn--sm"
+                  @click=${state.onChangeFolderTemplate}
+                  style="padding: 2px 8px; font-size: 0.72rem;"
+                >Change</button>`
+                : nothing
+            }
+          </div>
+        `
+          : nothing
+      }
       <div style="display: flex; gap: 6px;">
         <button
           class="btn btn--sm ${state.verifyMode === "none" ? "primary" : ""}"
@@ -358,6 +397,49 @@ function renderProgress(state: IngestViewState) {
   `;
 }
 
+function renderSafeToFormatBanner(result: IngestResult | null) {
+  if (!result) {
+    return nothing;
+  }
+  if (result.safe_to_format === true) {
+    return html`
+      <div
+        style="
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 12px 16px;
+          border-radius: var(--radius-sm);
+          margin-bottom: 12px;
+          background: rgba(46, 125, 50, 0.1);
+          border: 2px solid var(--ok);
+        "
+      >
+        <span style="font-size: 1.5rem; color: var(--ok)">&#x2713;</span>
+        <div>
+          <div style="font-weight: 700; font-size: 0.95rem; color: var(--ok)">Safe to Format Cards</div>
+          <div style="font-size: 0.78rem; color: var(--muted)">
+            All files copied to both destinations. All verifications passed.
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  if (result.safe_to_format === false) {
+    const hasBackup =
+      (result.totals?.backup_success_count ?? 0) > 0 || (result.totals?.backup_fail_count ?? 0) > 0;
+    return html`
+      <div style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: var(--radius-sm); margin-bottom: 12px; background: rgba(198, 40, 40, 0.1); border: 2px solid var(--danger);">
+        <span style="font-size: 1.5rem; color: var(--danger);">&#x2717;</span>
+        <div>
+          <div style="font-weight: 700; font-size: 0.95rem; color: var(--danger);">Do NOT Format Cards</div>
+          <div style="font-size: 0.78rem; color: var(--muted);">${hasBackup ? "Some files failed to copy or verify. Check the receipt for details." : "No backup configured. Set up backup in Settings first."}</div>
+        </div>
+      </div>`;
+  }
+  return nothing;
+}
+
 function renderDone(state: IngestViewState) {
   const t = state.result?.totals;
   const elapsed = state.progress?.elapsed_ms;
@@ -367,6 +449,7 @@ function renderDone(state: IngestViewState) {
       : null;
   return html`
     <div style="margin-top: 12px;">
+      ${renderSafeToFormatBanner(state.result)}
       ${
         t
           ? html`
@@ -400,6 +483,22 @@ function renderDone(state: IngestViewState) {
                 ? html`<div style="background: var(--secondary); padding: 10px; border-radius: var(--radius-sm);">
                   <div style="font-size: 0.7rem; color: var(--muted); text-transform: uppercase;">Verified</div>
                   <div style="font-size: 1.2rem; font-weight: 600; color: ${t.verified_mismatch > 0 ? "var(--danger)" : "var(--ok)"};">${t.verified_ok}/${t.verified_count}</div>
+                </div>`
+                : nothing
+            }
+            ${
+              t.backup_success_count > 0
+                ? html`<div style="background: var(--secondary); padding: 10px; border-radius: var(--radius-sm);">
+                  <div style="font-size: 0.7rem; color: var(--muted); text-transform: uppercase;">Backup</div>
+                  <div style="font-size: 1.2rem; font-weight: 600; color: ${t.backup_fail_count > 0 ? "var(--danger)" : "var(--ok)"};">${t.backup_success_count} copied</div>
+                </div>`
+                : nothing
+            }
+            ${
+              t.backup_verified_count > 0
+                ? html`<div style="background: var(--secondary); padding: 10px; border-radius: var(--radius-sm);">
+                  <div style="font-size: 0.7rem; color: var(--muted); text-transform: uppercase;">Backup verified</div>
+                  <div style="font-size: 1.2rem; font-weight: 600; color: ${t.backup_verified_mismatch > 0 ? "var(--danger)" : "var(--ok)"};">${t.backup_verified_ok}/${t.backup_verified_count}</div>
                 </div>`
                 : nothing
             }

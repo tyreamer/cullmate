@@ -1,4 +1,5 @@
 import { html } from "lit";
+import type { FolderTemplate } from "../../../../src/photo/folder-template.js";
 import type { UiSettings } from "../storage.ts";
 import { formatPathLabel, type StorageConfig } from "../controllers/storage.ts";
 
@@ -6,9 +7,11 @@ export type SettingsViewState = {
   settings: UiSettings;
   connected: boolean;
   storageConfig: StorageConfig | null;
+  folderTemplate: FolderTemplate | null;
   onSettingsChange: (next: UiSettings) => void;
   onPickFolder: () => void;
   onChangeStorage: () => void;
+  onChangeFolderTemplate: () => void;
 };
 
 export function renderSettingsView(state: SettingsViewState) {
@@ -60,6 +63,36 @@ export function renderSettingsView(state: SettingsViewState) {
           </section>
         `
       }
+
+      <section>
+        <h3 style="font-size: 0.9rem; margin: 0 0 8px;">Folder Structure</h3>
+        ${
+          state.folderTemplate
+            ? html`
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span
+                style="display: inline-flex; align-items: center; gap: 6px; background: var(--secondary); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 0.82rem;"
+              >
+                <span style="font-weight: 500;">${state.folderTemplate.name}</span>
+                <span style="font-size: 0.72rem; color: var(--muted);">${state.folderTemplate.description}</span>
+              </span>
+              <button
+                class="btn btn--sm"
+                @click=${state.onChangeFolderTemplate}
+                style="padding: 4px 12px; font-size: 0.78rem;"
+              >Change\u2026</button>
+            </div>
+          `
+            : html`
+            <p style="font-size: 0.82rem; color: var(--muted); margin: 0 0 8px;">No folder template configured. Using classic layout.</p>
+            <button
+              class="btn btn--sm primary"
+              @click=${state.onChangeFolderTemplate}
+              style="padding: 6px 14px; font-size: 0.82rem;"
+            >Choose Template</button>
+          `
+        }
+      </section>
 
       <section>
         <h3 style="font-size: 0.9rem; margin: 0 0 8px;">Default save location</h3>

@@ -1,5 +1,6 @@
 import { LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import type { FolderTemplate } from "../../../src/photo/folder-template.js";
 import type { EventLogEntry } from "./app-events.ts";
 import type { AppViewState } from "./app-view-state.ts";
 import type { DevicePairingList } from "./controllers/devices.ts";
@@ -86,6 +87,11 @@ import {
 } from "./app-tool-stream.ts";
 import { normalizeAssistantIdentity } from "./assistant-identity.ts";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity.ts";
+import {
+  loadFolderTemplate,
+  saveFolderTemplate,
+  ALL_PRESETS,
+} from "./controllers/folder-template.ts";
 import { loadStorageConfig, saveStorageConfig, type StorageConfig } from "./controllers/storage.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
@@ -182,6 +188,18 @@ export class OpenClawApp extends LitElement {
   private pendingModalIngest = false;
   private pendingSourcePath: string | null = null;
   private lastProgressUpdateAt = 0;
+
+  // Folder template state
+  @state() folderTemplate: FolderTemplate | null = loadFolderTemplate();
+  @state() isFolderTemplatePickerOpen = false;
+  @state() folderTemplatePickerSelected: FolderTemplate | null = null;
+  @state() folderTemplatePickerCustom: FolderTemplate | null = null;
+  @state() folderTemplateOllamaAvailable = false;
+  @state() folderTemplateOllamaPrompt = "";
+  @state() folderTemplateOllamaGenerating = false;
+  @state() folderTemplateOllamaError: string | null = null;
+  @state() folderTemplateOllamaModels: string[] = [];
+  @state() folderTemplateOllamaSelectedModel = "";
 
   // Storage setup state
   @state() storageConfig: StorageConfig | null = loadStorageConfig();
@@ -583,9 +601,10 @@ export class OpenClawApp extends LitElement {
   // Ingest handlers
   /** Called after gateway connects to open deferred modals from URL params. */
   consumePendingModal() {
-    // If no storage config, auto-load volumes for the first-run setup screen
+    // If no storage config, load volumes for the first-run setup screen
+    // (without resetting any user-entered paths — handleOpenStorageSetup resets them)
     if (!this.storageConfig && !this.settings.developerMode) {
-      this.handleOpenStorageSetup();
+      this.loadStorageSetupVolumes();
     }
     if (!this.pendingModalIngest) {
       return;
@@ -725,6 +744,8 @@ export class OpenClawApp extends LitElement {
         hash_algo: "blake3",
         overwrite: false,
         dedupe: this.ingestDedupeEnabled,
+        backup_dest: this.storageConfig?.backupDest || undefined,
+        folder_template: this.folderTemplate ?? undefined,
       });
       this.ingestResult = result;
       this.ingestStage = "done";
@@ -798,31 +819,108 @@ export class OpenClawApp extends LitElement {
     }
   }
 
+  // Folder template handlers
+
+  handleOpenFolderTemplatePicker() {
+    this.isFolderTemplatePickerOpen = true;
+    this.folderTemplatePickerSelected = this.folderTemplate ?? ALL_PRESETS[0];
+    this.folderTemplatePickerCustom = null;
+    this.folderTemplateOllamaPrompt = "";
+    this.folderTemplateOllamaError = null;
+    this.folderTemplateOllamaGenerating = false;
+    // Check Ollama availability in background
+    void this.checkOllamaAvailability();
+  }
+
+  handleCloseFolderTemplatePicker() {
+    this.isFolderTemplatePickerOpen = false;
+  }
+
+  handleSelectFolderTemplatePreset(t: FolderTemplate) {
+    this.folderTemplatePickerSelected = t;
+    this.folderTemplatePickerCustom = null;
+  }
+
+  handleSaveFolderTemplate(t: FolderTemplate) {
+    saveFolderTemplate(t);
+    this.folderTemplate = t;
+    this.isFolderTemplatePickerOpen = false;
+  }
+
+  handleSkipFolderTemplate() {
+    // Save the classic preset as default
+    saveFolderTemplate(ALL_PRESETS[0]);
+    this.folderTemplate = ALL_PRESETS[0];
+    this.isFolderTemplatePickerOpen = false;
+  }
+
+  async checkOllamaAvailability() {
+    try {
+      const { checkOllamaAvailability } = await import("./controllers/ollama-check.ts");
+      const status = await checkOllamaAvailability();
+      this.folderTemplateOllamaAvailable = status.available;
+      this.folderTemplateOllamaModels = status.models;
+      if (status.models.length > 0 && !this.folderTemplateOllamaSelectedModel) {
+        this.folderTemplateOllamaSelectedModel = status.models[0];
+      }
+    } catch {
+      this.folderTemplateOllamaAvailable = false;
+    }
+  }
+
+  async handleGenerateTemplateFromPrompt() {
+    if (!this.client || !this.folderTemplateOllamaPrompt.trim()) {
+      return;
+    }
+    this.folderTemplateOllamaGenerating = true;
+    this.folderTemplateOllamaError = null;
+    try {
+      const response = await this.client.request<{ template: FolderTemplate }>(
+        "photo.generate_template",
+        {
+          prompt: this.folderTemplateOllamaPrompt.trim(),
+          model_id: this.folderTemplateOllamaSelectedModel || undefined,
+        },
+      );
+      this.folderTemplatePickerCustom = response.template;
+      this.folderTemplatePickerSelected = null;
+    } catch (err) {
+      this.folderTemplateOllamaError = err instanceof Error ? err.message : String(err);
+    } finally {
+      this.folderTemplateOllamaGenerating = false;
+    }
+  }
+
   // Storage setup handlers
+
+  /** Load volumes without resetting user-entered paths. Safe to call on reconnect. */
+  loadStorageSetupVolumes() {
+    if (!this.client) {
+      return;
+    }
+    this.storageSetupVolumesLoading = true;
+    import("./controllers/ingest.ts")
+      .then(({ listVolumes }) => {
+        listVolumes(this.client!)
+          .then((result) => {
+            this.storageSetupVolumes = result.volumes;
+            this.storageSetupVolumesLoading = false;
+          })
+          .catch(() => {
+            this.storageSetupVolumesLoading = false;
+          });
+      })
+      .catch(() => {
+        this.storageSetupVolumesLoading = false;
+      });
+  }
+
+  /** Opens the storage setup dialog (from settings). Resets paths to current config. */
   handleOpenStorageSetup() {
     this.isStorageSetupOpen = true;
     this.storageSetupPrimaryDest = this.storageConfig?.primaryDest ?? "";
     this.storageSetupBackupDest = this.storageConfig?.backupDest ?? "";
-    this.storageSetupVolumesLoading = true;
-    // Load volumes in background
-    if (this.client) {
-      import("./controllers/ingest.ts")
-        .then(({ listVolumes }) => {
-          listVolumes(this.client!)
-            .then((result) => {
-              this.storageSetupVolumes = result.volumes;
-              this.storageSetupVolumesLoading = false;
-            })
-            .catch(() => {
-              this.storageSetupVolumesLoading = false;
-            });
-        })
-        .catch(() => {
-          this.storageSetupVolumesLoading = false;
-        });
-    } else {
-      this.storageSetupVolumesLoading = false;
-    }
+    this.loadStorageSetupVolumes();
   }
 
   handleSaveStorageSetup(cfg: StorageConfig) {
@@ -833,6 +931,44 @@ export class OpenClawApp extends LitElement {
     if (this.ingestStage === "prompting") {
       this.ingestDestPath = cfg.primaryDest;
     }
+  }
+
+  async handleStoragePickPrimary() {
+    if (!this.client) {
+      return;
+    }
+    const { pickFolder } = await import("./controllers/ingest.ts");
+    try {
+      const result = await pickFolder(this.client, { prompt: "Choose primary folder" });
+      if (result.ok) {
+        this.storageSetupPrimaryDest = result.path;
+      }
+    } catch (err) {
+      console.error("[storage-setup] Failed to pick primary folder:", err);
+    }
+  }
+
+  async handleStoragePickBackup() {
+    if (!this.client) {
+      return;
+    }
+    const { pickFolder } = await import("./controllers/ingest.ts");
+    try {
+      const result = await pickFolder(this.client, { prompt: "Choose backup folder" });
+      if (result.ok) {
+        this.storageSetupBackupDest = result.path;
+      }
+    } catch (err) {
+      console.error("[storage-setup] Failed to pick backup folder:", err);
+    }
+  }
+
+  handleStoragePrimaryChange(path: string) {
+    this.storageSetupPrimaryDest = path;
+  }
+
+  handleStorageBackupChange(path: string) {
+    this.storageSetupBackupDest = path;
   }
 
   // Sidebar handlers for tool output viewing

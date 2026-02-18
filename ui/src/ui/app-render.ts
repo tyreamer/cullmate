@@ -40,6 +40,7 @@ import {
   saveExecApprovals,
   updateExecApprovalsFormValue,
 } from "./controllers/exec-approvals.ts";
+import { ALL_PRESETS } from "./controllers/folder-template.ts";
 import { openPath } from "./controllers/ingest.ts";
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
@@ -68,6 +69,7 @@ import { renderConfig } from "./views/config.ts";
 import { renderCron } from "./views/cron.ts";
 import { renderDebug } from "./views/debug.ts";
 import { renderExecApprovalPrompt } from "./views/exec-approval.ts";
+import { renderFolderTemplatePicker } from "./views/folder-template-picker.ts";
 import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation.ts";
 import { renderHome } from "./views/home.ts";
 import { renderIngestModal } from "./views/ingest.ts";
@@ -130,40 +132,41 @@ export function renderApp(state: AppViewState) {
       volumesLoading: state.storageSetupVolumesLoading,
       connected: state.connected,
       editing: state.isStorageSetupOpen && !!state.storageConfig,
-      onPrimaryChange: (path) => (state.storageSetupPrimaryDest = path),
-      onBackupChange: (path) => (state.storageSetupBackupDest = path),
-      onPickPrimary: async () => {
-        if (!state.client) {
-          return;
-        }
-        const { pickFolder } = await import("./controllers/ingest.ts");
-        try {
-          const result = await pickFolder(state.client, { prompt: "Choose primary folder" });
-          if (result.ok) {
-            state.storageSetupPrimaryDest = result.path;
-          }
-        } catch {
-          /* ignore */
-        }
-      },
-      onPickBackup: async () => {
-        if (!state.client) {
-          return;
-        }
-        const { pickFolder } = await import("./controllers/ingest.ts");
-        try {
-          const result = await pickFolder(state.client, { prompt: "Choose backup folder" });
-          if (result.ok) {
-            state.storageSetupBackupDest = result.path;
-          }
-        } catch {
-          /* ignore */
-        }
-      },
+      onPrimaryChange: (path) => state.handleStoragePrimaryChange(path),
+      onBackupChange: (path) => state.handleStorageBackupChange(path),
+      onPickPrimary: () => void state.handleStoragePickPrimary(),
+      onPickBackup: () => void state.handleStoragePickBackup(),
       onSave: (cfg) => state.handleSaveStorageSetup(cfg),
       onCancel:
         state.isStorageSetupOpen && state.storageConfig
           ? () => (state.isStorageSetupOpen = false)
+          : undefined,
+    });
+  }
+
+  // Gate: show folder template picker if storage is configured but no template yet
+  const needsFolderTemplate =
+    state.storageConfig && !state.folderTemplate && !state.settings.developerMode;
+  if (needsFolderTemplate || state.isFolderTemplatePickerOpen) {
+    return renderFolderTemplatePicker({
+      presets: ALL_PRESETS,
+      selectedTemplate: state.folderTemplatePickerSelected,
+      customTemplate: state.folderTemplatePickerCustom,
+      ollamaAvailable: state.folderTemplateOllamaAvailable,
+      ollamaPrompt: state.folderTemplateOllamaPrompt,
+      ollamaGenerating: state.folderTemplateOllamaGenerating,
+      ollamaError: state.folderTemplateOllamaError,
+      ollamaModels: state.folderTemplateOllamaModels,
+      ollamaSelectedModel: state.folderTemplateOllamaSelectedModel,
+      onSelectPreset: (t) => state.handleSelectFolderTemplatePreset(t),
+      onPromptChange: (v) => (state.folderTemplateOllamaPrompt = v),
+      onGenerate: () => {},
+      onModelChange: (id) => (state.folderTemplateOllamaSelectedModel = id),
+      onSave: (t) => state.handleSaveFolderTemplate(t),
+      onSkip: needsFolderTemplate ? () => state.handleSkipFolderTemplate() : undefined,
+      onCancel:
+        state.isFolderTemplatePickerOpen && state.folderTemplate
+          ? () => state.handleCloseFolderTemplatePicker()
           : undefined,
     });
   }
@@ -385,8 +388,10 @@ export function renderApp(state: AppViewState) {
                 settings: state.settings,
                 connected: state.connected,
                 storageConfig: state.storageConfig,
+                folderTemplate: state.folderTemplate,
                 onSettingsChange: (next) => state.applySettings(next),
                 onChangeStorage: () => state.handleOpenStorageSetup(),
+                onChangeFolderTemplate: () => state.handleOpenFolderTemplatePicker(),
                 onPickFolder: async () => {
                   if (!state.client) {
                     return;
@@ -1169,6 +1174,7 @@ export function renderApp(state: AppViewState) {
         connected: state.connected,
         recentProjects: state.ingestRecentProjects,
         suggestedSources: state.ingestSuggestedSources,
+        folderTemplate: state.folderTemplate,
         onSourcePathChange: (v) => state.handleIngestSourcePathChange(v),
         onDestPathChange: (v) => (state.ingestDestPath = v),
         onProjectNameChange: (v) => (state.ingestProjectName = v),
@@ -1182,6 +1188,7 @@ export function renderApp(state: AppViewState) {
         onPickSource: () => void state.handleIngestPickSource(),
         onPickDest: () => void state.handleIngestPickDest(),
         onChangeStorage: state.storageConfig ? () => state.handleOpenStorageSetup() : undefined,
+        onChangeFolderTemplate: () => state.handleOpenFolderTemplatePicker(),
         onSelectSuggestedSource: (s) => state.handleIngestSelectSuggestedSource(s),
         onStart: () => void state.handleIngestStart(),
         onClose: () => state.handleIngestClose(),
