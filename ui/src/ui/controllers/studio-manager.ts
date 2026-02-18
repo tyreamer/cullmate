@@ -50,6 +50,13 @@ export type TimelineEntry = TextMessage | ActionCard | StatusCard | ResultCard;
 
 // ── Builder ──
 
+/**
+ * Deterministic flow state machine.
+ *
+ * Given the current app state, returns exactly the right timeline entries.
+ * States flow: storage_missing → template_missing → (card_detected | idle).
+ * Each state emits a single "next step" action card — never two competing primary CTAs.
+ */
 export function buildStarterTimeline(opts: {
   suggestedSources: SuggestedSource[];
   recentProjects: RecentProject[];
@@ -57,93 +64,106 @@ export function buildStarterTimeline(opts: {
   hasFolderTemplate: boolean;
 }): TimelineEntry[] {
   const { suggestedSources, recentProjects, hasStorageConfig, hasFolderTemplate } = opts;
-  const bothReady = hasStorageConfig && hasFolderTemplate;
 
-  // ── First-boot path ──
-  if (!bothReady) {
-    const entries: TimelineEntry[] = [];
-
-    entries.push({
-      kind: "text",
-      id: "welcome",
-      role: "cullmate",
-      body: COPY.welcomeGreeting,
-    });
-
-    entries.push({
-      kind: "action",
-      id: "setup-storage",
-      role: "cullmate",
-      title: COPY.storageTitle,
-      primaryButton: { label: COPY.storageButton, action: "open-storage-setup" },
-      done: hasStorageConfig,
-    });
-
-    entries.push({
-      kind: "action",
-      id: "setup-organization",
-      role: "cullmate",
-      title: COPY.organizationTitle,
-      primaryButton: {
-        label: COPY.organizationChooseButton,
-        action: "open-template-picker",
+  // ── State: storage_missing ──
+  if (!hasStorageConfig) {
+    return [
+      {
+        kind: "text",
+        id: "welcome",
+        role: "cullmate",
+        body: COPY.welcomeGreeting,
       },
-      secondaryButtons: [
-        { label: COPY.organizationDescribeButton, action: "open-template-describe" },
-      ],
-      done: hasFolderTemplate,
-    });
+      {
+        kind: "action",
+        id: "setup-storage",
+        role: "cullmate",
+        title: COPY.storageTitle,
+        primaryButton: { label: COPY.storageButton, action: "open-storage-setup" },
+      },
+    ];
+  }
 
-    entries.push({
-      kind: "action",
-      id: "first-import",
-      role: "cullmate",
-      title: COPY.readyToImport,
-      primaryButton: { label: COPY.savePhotosSafely, action: "open-import" },
-      disabled: !bothReady,
-    });
+  // ── State: template_missing ──
+  if (!hasFolderTemplate) {
+    return [
+      {
+        kind: "text",
+        id: "storage-done",
+        role: "cullmate",
+        body: COPY.storageDone,
+      },
+      {
+        kind: "action",
+        id: "setup-organization",
+        role: "cullmate",
+        title: COPY.organizationTitle,
+        primaryButton: {
+          label: COPY.organizationChooseButton,
+          action: "open-template-picker",
+        },
+        secondaryButtons: [
+          { label: COPY.organizationDescribeButton, action: "open-template-describe" },
+        ],
+      },
+    ];
+  }
+
+  // ── State: card_detected (both configured, source found) ──
+  if (suggestedSources.length > 0) {
+    const source = suggestedSources[0];
+    const label = source.label || formatPathLabel(source.path);
+    const entries: TimelineEntry[] = [
+      {
+        kind: "text",
+        id: "detected-source",
+        role: "cullmate",
+        body: COPY.detectedSourceBody(label),
+      },
+      {
+        kind: "action",
+        id: "import-detected",
+        role: "cullmate",
+        title: COPY.savePhotosSafely,
+        primaryButton: { label: COPY.savePhotosSafely, action: "import-detected" },
+        secondaryButtons: [{ label: COPY.notNow, action: "dismiss-detected" }],
+      },
+    ];
+
+    if (recentProjects.length > 0) {
+      entries.push({
+        kind: "action",
+        id: "recent-projects",
+        role: "cullmate",
+        title: COPY.recentTitle,
+        description: COPY.recentDescription,
+        primaryButton: { label: COPY.recentTitle, action: "view-projects" },
+        chips: recentProjects.slice(0, 5).map((p) => ({
+          label: p.projectName,
+          action: `open-recent:${p.projectRoot}`,
+        })),
+      });
+    }
 
     return entries;
   }
 
-  // ── Returning user path ──
-  const entries: TimelineEntry[] = [];
-
-  if (suggestedSources.length > 0) {
-    const source = suggestedSources[0];
-    const label = source.label || formatPathLabel(source.path);
-
-    entries.push({
-      kind: "text",
-      id: "detected-source",
-      role: "cullmate",
-      body: COPY.detectedSourceBody(label),
-    });
-
-    entries.push({
-      kind: "action",
-      id: "import-detected",
-      role: "cullmate",
-      title: COPY.savePhotosSafely,
-      primaryButton: { label: COPY.savePhotosSafely, action: "import-detected" },
-      secondaryButtons: [{ label: COPY.notNow, action: "dismiss-detected" }],
-    });
-  } else {
-    entries.push({
+  // ── State: idle (both configured, no source detected) ──
+  const entries: TimelineEntry[] = [
+    {
       kind: "text",
       id: "ready",
       role: "cullmate",
       body: COPY.readyWhenYouAre,
-    });
-
-    entries.push({
+    },
+    {
       kind: "action",
       id: "import-open",
       role: "cullmate",
       title: COPY.savePhotosSafely,
       primaryButton: { label: COPY.savePhotosSafely, action: "open-import" },
-    });
-  }
+    },
+  ];
 
   if (recentProjects.length > 0) {
     entries.push({

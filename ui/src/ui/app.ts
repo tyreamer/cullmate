@@ -103,6 +103,16 @@ declare global {
   }
 }
 
+function formatBytesSimple(bytes: number): string {
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(0)} KB`;
+  }
+  if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 function suggestProjectNameClient(sourcePath: string): string {
   const now = new Date();
   const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
@@ -213,6 +223,8 @@ export class OpenClawApp extends LitElement {
 
   // Studio Manager timeline
   @state() studioTimeline: TimelineEntry[] = [];
+  // Settings sheet (normal mode overlay)
+  @state() isSettingsSheetOpen = false;
 
   @state() nodesLoading = false;
   @state() nodes: Array<Record<string, unknown>> = [];
@@ -810,6 +822,7 @@ export class OpenClawApp extends LitElement {
     if (isFinal || isStageChange) {
       this.ingestProgress = details;
       this.lastProgressUpdateAt = Date.now();
+      this.updateStudioIngestProgress(details);
       return;
     }
     // Throttle to max 10 updates/sec for same-stage progress
@@ -817,7 +830,74 @@ export class OpenClawApp extends LitElement {
     if (now - this.lastProgressUpdateAt >= 100) {
       this.ingestProgress = details;
       this.lastProgressUpdateAt = now;
+      this.updateStudioIngestProgress(details);
     }
+  }
+
+  /** Update the Studio Manager timeline's status card with latest progress. */
+  private updateStudioIngestProgress(p: IngestProgress) {
+    if (this.settings.developerMode) {
+      return; // Dev mode uses the old modal
+    }
+    const statusIndex = this.studioTimeline.findIndex(
+      (e) => e.kind === "status" && e.id === "ingest-progress",
+    );
+    if (statusIndex < 0) {
+      return;
+    }
+
+    let statusLine: string;
+    let progressPercent = 0;
+    const counters: Array<{ label: string; value: string }> = [];
+
+    switch (p.type) {
+      case "ingest.start":
+      case "ingest.scan.progress":
+        statusLine = `Looking for photos\u2026 ${p.discovered_count ? `(${p.discovered_count} found)` : ""}`;
+        break;
+      case "ingest.copy.progress":
+        statusLine = `Copying photos\u2026 ${p.index ?? 0} of ${p.total ?? 0}`;
+        progressPercent = p.total ? Math.round(((p.index ?? 0) / p.total) * 100) : 0;
+        if (p.total) {
+          counters.push({ label: "Files", value: `${p.index ?? 0}/${p.total}` });
+        }
+        break;
+      case "ingest.verify.progress":
+        statusLine = "Double-checking everything is safe\u2026";
+        progressPercent = p.verified_total
+          ? Math.round(((p.verified_count ?? 0) / p.verified_total) * 100)
+          : 0;
+        break;
+      case "ingest.backup.start":
+      case "ingest.backup.copy.progress":
+        statusLine = `Backing up\u2026 ${p.index ? `${p.index} of ${p.total ?? 0}` : ""}`;
+        progressPercent = p.total ? Math.round(((p.index ?? 0) / p.total) * 100) : 0;
+        break;
+      case "ingest.backup.verify.progress":
+        statusLine = "Verifying backup\u2026";
+        break;
+      case "ingest.report.generated":
+        statusLine = "Writing Safety Report\u2026";
+        progressPercent = 95;
+        break;
+      case "ingest.done":
+        statusLine = "All done!";
+        progressPercent = 100;
+        break;
+      default:
+        statusLine = "Processing\u2026";
+    }
+
+    const updated = [...this.studioTimeline];
+    updated[statusIndex] = {
+      kind: "status" as const,
+      id: "ingest-progress",
+      role: "cullmate" as const,
+      statusLine,
+      progressPercent,
+      counters: counters.length > 0 ? counters : undefined,
+    };
+    this.studioTimeline = updated;
   }
 
   // Folder template handlers
@@ -1051,11 +1131,23 @@ export class OpenClawApp extends LitElement {
         this.handleOpenFolderTemplatePicker();
         break;
       case "open-import":
-        void this.handleIngestOpen();
+        if (this.settings.developerMode) {
+          void this.handleIngestOpen();
+        } else {
+          // Normal mode: open the ingest modal for source picking, but results show inline
+          void this.handleIngestOpen();
+        }
+        break;
+      case "open-settings":
+        this.isSettingsSheetOpen = true;
         break;
       case "import-detected":
         if (this.ingestSuggestedSources.length > 0) {
-          this.handleIngestSelectSuggestedSource(this.ingestSuggestedSources[0]);
+          if (this.settings.developerMode) {
+            this.handleIngestSelectSuggestedSource(this.ingestSuggestedSources[0]);
+          } else {
+            void this.handleStudioIngestFromSource(this.ingestSuggestedSources[0]);
+          }
         }
         break;
       case "dismiss-detected":
@@ -1064,7 +1156,18 @@ export class OpenClawApp extends LitElement {
         );
         break;
       case "view-projects":
-        this.setTab("projects" as Tab);
+        if (this.settings.developerMode) {
+          this.setTab("projects" as Tab);
+        } else {
+          // In normal mode, projects aren't a separate tab — just open finder
+          // for each project
+        }
+        break;
+      case "studio-open-report":
+        void this.handleIngestOpenReport();
+        break;
+      case "studio-reveal-project":
+        void this.handleIngestRevealProject();
         break;
       default:
         if (action.startsWith("open-recent:")) {
@@ -1076,6 +1179,129 @@ export class OpenClawApp extends LitElement {
           }
         }
         break;
+    }
+  }
+
+  /**
+   * Inline ingest for Studio Manager (normal mode).
+   * Auto-names the project and starts ingest with progress in the timeline.
+   */
+  async handleStudioIngestFromSource(source: import("./controllers/ingest.ts").SuggestedSource) {
+    if (!this.client || !this.storageConfig) {
+      return;
+    }
+
+    const sourcePath = source.path;
+    const destPath = this.storageConfig.primaryDest;
+    const projectName = suggestProjectNameClient(sourcePath);
+    const { COPY } = await import("./copy/studio-manager-copy.ts");
+
+    // Replace the action cards with a status card
+    this.studioTimeline = [
+      {
+        kind: "text" as const,
+        id: "ingest-started",
+        role: "cullmate" as const,
+        body: `Saving photos from ${source.label || sourcePath.split("/").pop() || sourcePath}\u2026`,
+      },
+      {
+        kind: "status" as const,
+        id: "ingest-progress",
+        role: "cullmate" as const,
+        statusLine: COPY.statusScanning,
+        progressPercent: 0,
+      },
+    ];
+
+    // Track progress in the timeline
+    this.ingestStage = "running";
+    this.ingestSourcePath = sourcePath;
+    this.ingestDestPath = destPath;
+    this.ingestProjectName = projectName;
+    this.ingestProgress = null;
+    this.ingestError = null;
+    this.lastProgressUpdateAt = 0;
+
+    try {
+      const { runIngestVerify, saveRecentProject } = await import("./controllers/ingest.ts");
+      const result = await runIngestVerify(this.client, {
+        source_path: sourcePath,
+        dest_project_path: destPath,
+        project_name: projectName,
+        verify_mode: this.settings.defaultVerifyMode || "none",
+        hash_algo: "blake3",
+        overwrite: false,
+        dedupe: false,
+        backup_dest: this.storageConfig.backupDest || undefined,
+        folder_template: this.folderTemplate ?? undefined,
+      });
+
+      this.ingestResult = result;
+      this.ingestStage = "done";
+
+      if (result.ok && result.project_root) {
+        saveRecentProject({
+          projectName,
+          projectRoot: result.project_root,
+          reportPath: result.report_path,
+          destPath,
+          sourcePath,
+          timestamp: Date.now(),
+        });
+      }
+
+      // Show result card in timeline
+      const safeToFormat = result.safe_to_format ?? null;
+      this.studioTimeline = [
+        {
+          kind: "text" as const,
+          id: "ingest-started",
+          role: "cullmate" as const,
+          body: COPY.statusDone,
+        },
+        {
+          kind: "result" as const,
+          id: "ingest-result",
+          role: "cullmate" as const,
+          safeToFormat,
+          headline: safeToFormat ? COPY.safeToFormatYes : COPY.safeToFormatNotYet,
+          detail: safeToFormat ? COPY.safeToFormatYesDetail : COPY.safeToFormatNoDetail,
+          buttons: [
+            { label: COPY.openSafetyReport, action: "studio-open-report" },
+            { label: COPY.openInFinder, action: "studio-reveal-project" },
+          ],
+          counters: result.totals
+            ? [
+                { label: "Copied", value: String(result.totals.success_count) },
+                ...(result.totals.total_bytes
+                  ? [{ label: "Size", value: formatBytesSimple(result.totals.total_bytes) }]
+                  : []),
+                ...(result.totals.fail_count > 0
+                  ? [{ label: "Failed", value: String(result.totals.fail_count) }]
+                  : []),
+              ]
+            : [],
+        },
+      ];
+    } catch (err) {
+      this.ingestError = err instanceof Error ? err.message : String(err);
+      this.ingestStage = "error";
+
+      this.studioTimeline = [
+        {
+          kind: "text" as const,
+          id: "ingest-error",
+          role: "cullmate" as const,
+          body: `Something went wrong: ${this.ingestError}`,
+        },
+        {
+          kind: "action" as const,
+          id: "import-retry",
+          role: "cullmate" as const,
+          title: "Try again?",
+          primaryButton: { label: COPY.savePhotosSafely, action: "import-detected" },
+        },
+      ];
     }
   }
 

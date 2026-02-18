@@ -62,7 +62,7 @@ export function renderProjectsView(state: ProjectsViewState) {
                 <button class="btn btn--sm" @click=${() => state.onOpenFolder(p)}>Open Folder</button>
                 ${
                   p.reportPath
-                    ? html`<button class="btn btn--sm" @click=${() => state.onOpenReport(p)}>View Receipt</button>`
+                    ? html`<button class="btn btn--sm" @click=${() => state.onOpenReport(p)}>View Safety Report</button>`
                     : nothing
                 }
               </div>

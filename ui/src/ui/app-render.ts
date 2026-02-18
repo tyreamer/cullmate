@@ -182,6 +182,8 @@ export function renderApp(state: AppViewState) {
     state.agentsList?.agents?.[0]?.id ??
     null;
 
+  const isDev = state.settings.developerMode;
+
   return html`
     <div class="shell ${isChat ? "shell--chat" : ""} ${chatFocus ? "shell--chat-focus" : ""} ${state.settings.navCollapsed || !isAdvancedTab(state.tab) ? "shell--nav-collapsed" : ""} ${state.onboarding ? "shell--onboarding" : ""}">
       <header class="topbar">
@@ -194,32 +196,33 @@ export function renderApp(state: AppViewState) {
               <div class="brand-title">CULLMATE</div>
             </div>
           </div>
-          <nav class="topnav" role="navigation" aria-label="Main">
-            ${PRIMARY_TABS.map(
-              (entry) => html`
+          ${
+            isDev
+              ? html`
+              <nav class="topnav" role="navigation" aria-label="Main">
+                ${PRIMARY_TABS.map(
+                  (entry) => html`
+                    <a
+                      href=${pathForTab(entry.tab as Tab, state.basePath)}
+                      class="topnav__link ${state.tab === entry.tab ? "active" : ""}"
+                      @click=${(e: MouseEvent) => {
+                        if (
+                          e.defaultPrevented ||
+                          e.button !== 0 ||
+                          e.metaKey ||
+                          e.ctrlKey ||
+                          e.shiftKey ||
+                          e.altKey
+                        ) {
+                          return;
+                        }
+                        e.preventDefault();
+                        state.setTab(entry.tab as Tab);
+                      }}
+                    >${entry.label}</a>
+                  `,
+                )}
                 <a
-                  href=${pathForTab(entry.tab as Tab, state.basePath)}
-                  class="topnav__link ${state.tab === entry.tab ? "active" : ""}"
-                  @click=${(e: MouseEvent) => {
-                    if (
-                      e.defaultPrevented ||
-                      e.button !== 0 ||
-                      e.metaKey ||
-                      e.ctrlKey ||
-                      e.shiftKey ||
-                      e.altKey
-                    ) {
-                      return;
-                    }
-                    e.preventDefault();
-                    state.setTab(entry.tab as Tab);
-                  }}
-                >${entry.label}</a>
-              `,
-            )}
-            ${
-              state.settings.developerMode
-                ? html`<a
                   href=${pathForTab("overview" as Tab, state.basePath)}
                   class="topnav__link ${isAdvancedTab(state.tab) ? "active" : ""}"
                   @click=${(e: MouseEvent) => {
@@ -236,18 +239,25 @@ export function renderApp(state: AppViewState) {
                     e.preventDefault();
                     state.setTab("overview" as Tab);
                   }}
-                >Developer</a>`
-                : nothing
-            }
-          </nav>
+                >Developer</a>
+              </nav>
+            `
+              : nothing
+          }
         </div>
         <div class="topbar-status">
-          <button
-            class="btn primary home-import-btn"
-            ?disabled=${!state.connected}
-            @click=${() => state.handleIngestOpen()}
-            title="Import photos from a source folder"
-          >Import Photos</button>
+          ${
+            isDev
+              ? html`
+                <button
+                  class="btn primary home-import-btn"
+                  ?disabled=${!state.connected}
+                  @click=${() => state.handleIngestOpen()}
+                  title="Import photos from a source folder"
+                >Import Photos</button>
+              `
+              : nothing
+          }
           ${
             isAdvancedTab(state.tab)
               ? html`
@@ -262,7 +272,23 @@ export function renderApp(state: AppViewState) {
                     <span class="topbar-health"><span class="statusDot"></span></span>
                   `
           }
-          ${renderThemeToggle(state)}
+          ${
+            !isDev
+              ? html`
+                <button
+                  class="studio-gear-btn"
+                  @click=${() => (state.isSettingsSheetOpen = !state.isSettingsSheetOpen)}
+                  title="Settings"
+                  aria-label="Settings"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  </svg>
+                </button>
+              `
+              : renderThemeToggle(state)
+          }
         </div>
       </header>
       ${
@@ -328,44 +354,46 @@ export function renderApp(state: AppViewState) {
         }
 
         ${
-          state.tab === "home"
-            ? state.settings.developerMode
-              ? renderHome({
-                  connected: state.connected,
-                  suggestedSources: state.ingestSuggestedSources,
-                  recentProjects: state.ingestRecentProjects,
-                  onImportClick: () => state.handleIngestOpen(),
-                  onSelectSuggestedSource: (s) => state.handleIngestSelectSuggestedSource(s),
-                  onSelectRecent: (p) => {
-                    state.ingestSourcePath = p.sourcePath;
-                    state.ingestDestPath = p.destPath;
-                    state.ingestProjectName = p.projectName;
-                    state.handleIngestOpen();
-                  },
-                  onOpenReport: (p) => {
-                    if (p.reportPath && state.client) {
-                      void openPath(state.client, p.reportPath, p.projectRoot, false).catch(
-                        () => {},
-                      );
-                    }
-                  },
-                  onRevealProject: (p) => {
-                    if (state.client) {
-                      void openPath(state.client, p.projectRoot, p.destPath, true).catch(() => {});
-                    }
-                  },
-                  onViewAllProjects: () => state.setTab("projects" as Tab),
-                })
-              : renderStudioManager({
-                  connected: state.connected,
-                  timeline: state.studioTimeline,
-                  onAction: (action) => state.handleStudioAction(action),
-                })
+          !isDev && (state.tab === "home" || state.tab === "projects" || state.tab === "settings")
+            ? renderStudioManager({
+                connected: state.connected,
+                timeline: state.studioTimeline,
+                onAction: (action) => state.handleStudioAction(action),
+              })
             : nothing
         }
 
         ${
-          state.tab === "projects"
+          state.tab === "home" && isDev
+            ? renderHome({
+                connected: state.connected,
+                suggestedSources: state.ingestSuggestedSources,
+                recentProjects: state.ingestRecentProjects,
+                onImportClick: () => state.handleIngestOpen(),
+                onSelectSuggestedSource: (s) => state.handleIngestSelectSuggestedSource(s),
+                onSelectRecent: (p) => {
+                  state.ingestSourcePath = p.sourcePath;
+                  state.ingestDestPath = p.destPath;
+                  state.ingestProjectName = p.projectName;
+                  state.handleIngestOpen();
+                },
+                onOpenReport: (p) => {
+                  if (p.reportPath && state.client) {
+                    void openPath(state.client, p.reportPath, p.projectRoot, false).catch(() => {});
+                  }
+                },
+                onRevealProject: (p) => {
+                  if (state.client) {
+                    void openPath(state.client, p.projectRoot, p.destPath, true).catch(() => {});
+                  }
+                },
+                onViewAllProjects: () => state.setTab("projects" as Tab),
+              })
+            : nothing
+        }
+
+        ${
+          state.tab === "projects" && isDev
             ? renderProjectsView({
                 recentProjects: state.ingestRecentProjects,
                 onOpenFolder: (p) => {
@@ -384,7 +412,7 @@ export function renderApp(state: AppViewState) {
         }
 
         ${
-          state.tab === "settings"
+          state.tab === "settings" && isDev
             ? renderSettingsView({
                 settings: state.settings,
                 connected: state.connected,
@@ -1196,6 +1224,63 @@ export function renderApp(state: AppViewState) {
         onOpenReport: () => void state.handleIngestOpenReport(),
         onRevealProject: () => void state.handleIngestRevealProject(),
       })}
+      ${
+        !isDev && state.isSettingsSheetOpen
+          ? html`
+            <div class="exec-approval-overlay" role="dialog" aria-label="Settings" @click=${(
+              e: MouseEvent,
+            ) => {
+              if ((e.target as HTMLElement).classList.contains("exec-approval-overlay")) {
+                state.isSettingsSheetOpen = false;
+              }
+            }}>
+              <div class="exec-approval-card" style="width: min(560px, 95vw); max-height: 85vh; overflow-y: auto;">
+                <div class="exec-approval-header">
+                  <div><div class="exec-approval-title">Settings</div></div>
+                  <button class="btn btn--sm" @click=${() => (state.isSettingsSheetOpen = false)} aria-label="Close"
+                    style="font-size: 1.1rem; line-height: 1; padding: 4px 8px;">&#x2715;</button>
+                </div>
+                <div style="margin-top: 16px;">
+                  ${renderSettingsView({
+                    settings: state.settings,
+                    connected: state.connected,
+                    storageConfig: state.storageConfig,
+                    folderTemplate: state.folderTemplate,
+                    onSettingsChange: (next) => state.applySettings(next),
+                    onChangeStorage: () => {
+                      state.isSettingsSheetOpen = false;
+                      state.handleOpenStorageSetup();
+                    },
+                    onChangeFolderTemplate: () => {
+                      state.isSettingsSheetOpen = false;
+                      state.handleOpenFolderTemplatePicker();
+                    },
+                    onPickFolder: async () => {
+                      if (!state.client) {
+                        return;
+                      }
+                      const { pickFolder } = await import("./controllers/ingest.ts");
+                      try {
+                        const result = await pickFolder(state.client, {
+                          prompt: "Choose default save location",
+                        });
+                        if (result.ok) {
+                          state.applySettings({
+                            ...state.settings,
+                            defaultSaveLocation: result.path,
+                          });
+                        }
+                      } catch (err) {
+                        console.error("Failed to pick folder:", err);
+                      }
+                    },
+                  })}
+                </div>
+              </div>
+            </div>
+          `
+          : nothing
+      }
     </div>
   `;
 }

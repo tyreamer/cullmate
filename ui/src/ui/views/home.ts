@@ -74,7 +74,7 @@ export function renderHome(state: HomeViewState) {
     <div class="home">
       <div class="home-hero">
         <h1 class="home-hero__title">Import. Verify. Done.</h1>
-        <p class="home-hero__sub">Copy from your card, stay organized, and get a receipt.</p>
+        <p class="home-hero__sub">Copy from your card, stay organized, and get a Safety Report.</p>
         <div class="home-hero__actions">
           <button
             class="btn primary home-hero__cta"
@@ -147,7 +147,7 @@ export function renderHome(state: HomeViewState) {
                     <div class="home-recent-card__actions">
                       ${
                         p.reportPath
-                          ? html`<button class="btn btn--sm" @click=${() => state.onOpenReport(p)}>Open Receipt</button>`
+                          ? html`<button class="btn btn--sm" @click=${() => state.onOpenReport(p)}>Open Safety Report</button>`
                           : nothing
                       }
                       <button class="btn btn--sm" @click=${() => state.onRevealProject(p)}>Reveal in Finder</button>

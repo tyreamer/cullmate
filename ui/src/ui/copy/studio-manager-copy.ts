@@ -5,6 +5,7 @@ export const COPY = {
   // Setup cards (first boot)
   storageTitle: "Where should I save your photos?",
   storageButton: "Set up storage",
+  storageDone: "Storage is set up. One more step.",
   organizationTitle: "How should I organize each job?",
   organizationChooseButton: "Choose a template",
   organizationDescribeButton: "Describe it",

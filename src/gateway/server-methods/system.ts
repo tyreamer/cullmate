@@ -205,15 +205,14 @@ export const systemHandlers: GatewayRequestHandlers = {
     const prompt = typeof params.prompt === "string" ? params.prompt.trim() : "Choose a folder";
     const defaultLocation =
       typeof params.default_location === "string" ? params.default_location.trim() : "";
-    // Use osascript to show a native folder picker dialog
-    const scriptParts = ["choose folder with prompt " + JSON.stringify(prompt)];
+    // Use osascript to show a native folder picker and return POSIX path directly
+    const scriptParts = ["POSIX path of (choose folder with prompt " + JSON.stringify(prompt)];
     if (defaultLocation) {
       scriptParts.push("default location POSIX file " + JSON.stringify(defaultLocation));
     }
-    const script = scriptParts.join(" ");
+    const script = scriptParts.join(" ") + ")";
     execFile("/usr/bin/osascript", ["-e", script], (err, stdout) => {
       if (err) {
-        // osascript returns exit code 1 when user cancels the dialog
         const msg = err.message ?? "";
         if (msg.includes("User canceled") || msg.includes("(-128)")) {
           respond(true, { ok: false, cancelled: true }, undefined);
@@ -222,29 +221,15 @@ export const systemHandlers: GatewayRequestHandlers = {
         respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, `pick_folder failed: ${msg}`));
         return;
       }
-      // osascript returns an HFS path like "Macintosh HD:Volumes:SD_CARD:DCIM:"
-      // Convert to POSIX using osascript
-      const hfsPath = stdout.trim();
-      if (!hfsPath) {
+      const posixPath = stdout.trim();
+      if (!posixPath) {
         respond(true, { ok: false, cancelled: true }, undefined);
         return;
       }
-      const posixScript = `POSIX path of (${JSON.stringify(hfsPath)} as alias)`;
-      execFile("/usr/bin/osascript", ["-e", posixScript], (posixErr, posixStdout) => {
-        if (posixErr) {
-          respond(
-            false,
-            undefined,
-            errorShape(ErrorCodes.UNAVAILABLE, `path conversion failed: ${posixErr.message}`),
-          );
-          return;
-        }
-        const posixPath = posixStdout.trim();
-        // Remove trailing slash for consistency (unless it's the root "/")
-        const normalized =
-          posixPath.length > 1 && posixPath.endsWith("/") ? posixPath.slice(0, -1) : posixPath;
-        respond(true, { ok: true, path: normalized }, undefined);
-      });
+      // Remove trailing slash for consistency (unless it's the root "/")
+      const normalized =
+        posixPath.length > 1 && posixPath.endsWith("/") ? posixPath.slice(0, -1) : posixPath;
+      respond(true, { ok: true, path: normalized }, undefined);
     });
   },
   "system.list_volumes": ({ respond }) => {

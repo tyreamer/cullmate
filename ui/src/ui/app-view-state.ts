@@ -109,6 +109,8 @@ export type AppViewState = {
   // Studio Manager timeline
   studioTimeline: TimelineEntry[];
   handleStudioAction: (action: string) => void;
+  // Settings sheet (normal mode overlay)
+  isSettingsSheetOpen: boolean;
   // Storage setup state
   storageConfig: StorageConfig | null;
   isStorageSetupOpen: boolean;

@@ -107,7 +107,7 @@ describe("ingest integration", () => {
 
     // Report HTML contains key info
     const reportHtml = await fs.readFile(manifest.report_path!, "utf-8");
-    expect(reportHtml).toContain("Cullmate Import Receipt");
+    expect(reportHtml).toContain("Cullmate Safety Report");
     expect(reportHtml).toContain("TestShoot");
     expect(reportHtml).toContain("IMG_001.jpg");
 

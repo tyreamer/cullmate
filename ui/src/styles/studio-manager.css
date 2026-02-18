@@ -216,6 +216,27 @@
   color: var(--danger);
 }
 
+/* ── Gear button ── */
+
+.studio-gear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+}
+
+.studio-gear-btn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
 /* ── Responsive ── */
 
 @media (max-width: 700px) {

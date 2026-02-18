@@ -116,7 +116,7 @@ function progressLabel(p: IngestProgress | null): string {
     case "ingest.backup.verify.progress":
       return `Verifying backup... (${p.verified_count ?? 0} of ${p.verified_total ?? 0})`;
     case "ingest.report.generated":
-      return "Writing receipt...";
+      return "Writing Safety Report...";
     case "ingest.done": {
       copyStartMs = 0;
       return "Complete!";
@@ -156,7 +156,7 @@ export function renderIngestModal(state: IngestViewState) {
             <div class="exec-approval-sub">
               ${
                 state.stage === "prompting"
-                  ? "Copy from your card and get a receipt"
+                  ? "Copy from your card and get a Safety Report"
                   : state.stage === "running"
                     ? "Importing..."
                     : state.stage === "done"
@@ -242,8 +242,8 @@ function renderPromptForm(state: IngestViewState) {
   const dedupeNote = state.dedupeEnabled ? " \u00b7 Skips duplicates" : "";
   const modeLabel =
     state.verifyMode === "none"
-      ? `Creates a receipt${dedupeNote} \u00b7 Copy only (never deletes originals)`
-      : `Creates a receipt \u00b7 Verifies a sample after copy${dedupeNote} \u00b7 Copy only (never deletes originals)`;
+      ? `Creates a Safety Report${dedupeNote} \u00b7 Copy only (never deletes originals)`
+      : `Creates a Safety Report \u00b7 Verifies a sample after copy${dedupeNote} \u00b7 Copy only (never deletes originals)`;
   return html`
     <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
       ${renderSuggestedSources(state)}
@@ -254,7 +254,7 @@ function renderPromptForm(state: IngestViewState) {
           <input
             type="text"
             class="mono"
-            placeholder="/Volumes/SD_CARD/DCIM"
+            placeholder="Choose your SD card or photo folder"
             .value=${state.sourcePath}
             @input=${(e: InputEvent) => state.onSourcePathChange((e.target as HTMLInputElement).value)}
             style="flex: 1; background: var(--secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); font-size: 0.85rem;"
@@ -433,7 +433,7 @@ function renderSafeToFormatBanner(result: IngestResult | null) {
         <span style="font-size: 1.5rem; color: var(--danger);">&#x2717;</span>
         <div>
           <div style="font-weight: 700; font-size: 0.95rem; color: var(--danger);">Do NOT Format Cards</div>
-          <div style="font-size: 0.78rem; color: var(--muted);">${hasBackup ? "Some files failed to copy or verify. Check the receipt for details." : "No backup configured. Set up backup in Settings first."}</div>
+          <div style="font-size: 0.78rem; color: var(--muted);">${hasBackup ? "Some files failed to copy or verify. Check the Safety Report for details." : "No backup configured. Set up backup in Settings first."}</div>
         </div>
       </div>`;
   }
@@ -523,7 +523,7 @@ function renderDone(state: IngestViewState) {
           : nothing
       }
       <div class="exec-approval-actions">
-        <button class="btn primary" @click=${state.onOpenReport}>Open Receipt</button>
+        <button class="btn primary" @click=${state.onOpenReport}>Open Safety Report</button>
         <button class="btn" @click=${state.onRevealProject}>Reveal in Finder</button>
         <button class="btn" @click=${state.onClose}>Close</button>
       </div>
