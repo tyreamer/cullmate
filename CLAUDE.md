@@ -92,7 +92,7 @@ The core Cullmate feature: non-destructive photo import from SD cards/folders to
 2. **Copy** (`copy.ts`) — Streams files to `<dest>/<ProjectName>/01_RAW/` preserving subdirectory structure, computes hash during copy (sha256 or blake3)
 3. **Verify** (`verify.ts`) — Optional post-copy integrity check: `none` (skip), `sentinel` (sample), `full` (all files)
 4. **Dedupe** — Opt-in (`dedupe: true`): pre-hashes files, skips identical content across subdirectories (e.g. dual-card shoots). OFF by default.
-5. **Report** (`report.ts`) — Generates HTML receipt + JSON manifest in `<project>/.cullmate/`
+5. **Report** (`report.ts`) — Generates HTML Safety Report + JSON manifest in `<project>/.cullmate/`
 
 **Types** (`src/photo/types.ts`): `IngestParams`, `IngestManifest`, `IngestProgressEvent`
 
@@ -103,35 +103,55 @@ The core Cullmate feature: non-destructive photo import from SD cards/folders to
 ├── 01_RAW/          # Copied media files (preserves subdirs)
 ├── 02_EXPORTS/      # Empty (for user's edits)
 ├── 03_DELIVERY/     # Empty (for final deliverables)
-└── .cullmate/       # Manifest JSON + HTML receipt
+└── .cullmate/       # Manifest JSON + HTML Safety Report
 ```
 
 **Agent tool**: `photo.ingest_verify` (`src/agents/tools/ingest-verify-tool.ts`) — Exposes ingest as an RPC-callable tool with progress streaming.
 
-## UI Architecture (Photographer-First)
+## UI Architecture (Studio Manager)
 
-The UI is a photographer-first app with a simple 3-tab primary navigation. Advanced OpenClaw features are hidden behind Developer Mode.
+The UI is a photographer-first app centered on a conversation-driven "Studio Manager" single-screen experience. Advanced OpenClaw features are hidden behind Developer Mode.
 
-**Primary tabs** (always visible): Home, Projects, Settings
-**Advanced tabs** (Developer Mode only): Chat, Overview, Channels, Instances, Sessions, Usage, Cron, Agents, Skills, Nodes, Config, Debug, Logs
+**Normal mode (default)**: Studio Manager timeline fills the screen. Minimal header with Cullmate logo + gear icon. No multi-tab navigation. Gear icon opens Settings as a sheet overlay. The timeline is a deterministic state machine:
+
+- `storage_missing` → greeting + "Set up storage" card
+- `template_missing` → "Storage is set up" + "Choose a template" card
+- `card_detected` → "Card detected: EOS R5" + "Save photos safely" card
+- `idle` → "Ready when you are" + "Save photos safely" card
+- `running` → StatusCard with progress (scanning → copying → verifying)
+- `done` → ResultCard with Safe-to-format YES/NO + action buttons
+
+**Developer Mode**: Full multi-tab shell with Home, Projects, Settings tabs + advanced sidebar (Chat, Overview, Channels, etc.). "Import Photos" button in topbar. Old Home view and ingest modal.
 
 **Key UI files**:
 
 - `ui/src/ui/app.ts` — Main `OpenClawApp` LitElement with all `@state()` fields
 - `ui/src/ui/app-view-state.ts` — `AppViewState` type (all state + handler signatures)
-- `ui/src/ui/app-render.ts` — `renderApp()` top-level render function
+- `ui/src/ui/app-render.ts` — `renderApp()` top-level render function, conditionally renders Studio Manager (normal) vs legacy shell (dev)
+- `ui/src/ui/views/studio-manager.ts` — `renderStudioManager()` with sub-renderers for text bubbles, action cards, status cards, result cards
+- `ui/src/ui/controllers/studio-manager.ts` — Timeline entry types (discriminated union on `kind`) + `buildStarterTimeline()` state machine
+- `ui/src/ui/copy/studio-manager-copy.ts` — All user-facing strings (no jargon, middle-school reading level)
 - `ui/src/ui/navigation.ts` — `Tab` union type, `PRIMARY_TABS`, `ADVANCED_TAB_GROUPS`
 - `ui/src/ui/storage.ts` — `UiSettings` (localStorage persistence, includes `developerMode`, `defaultSaveLocation`, `defaultVerifyMode`)
+
+**Smart Organizer** (AI-powered folder template generation):
+
+- `ui/src/ui/controllers/ai-provider.ts` — `FolderTemplateAIProvider` interface, `NullFolderTemplateProvider`
+- `ui/src/ui/controllers/ai-provider-ollama.ts` — `OllamaFolderTemplateProvider` (dev-only, wraps gateway RPC)
+- `ui/src/ui/controllers/ai-provider-factory.ts` — Factory: Ollama in dev mode, Null in normal mode
+- `src/photo/template-ai-validate.ts` — Validates AI-generated templates with user-friendly errors
 
 **Storage setup** (first-run onboarding):
 
 - `ui/src/ui/controllers/storage.ts` — `StorageConfig` (primaryDest + backupDest), localStorage persistence
 - `ui/src/ui/views/storage-setup.ts` — Two-step setup dialog (primary + backup), volume cards, same-folder/same-volume validation
-- App is gated: if no `StorageConfig` exists and Developer Mode is off, only the setup screen renders
+- Setup screens open as overlays when triggered by Studio Manager action cards or Settings sheet
 
 **View pattern**: Each tab has a `renderXxx(state: XxxViewState)` function in `ui/src/ui/views/`. Views receive a typed state prop object (never the full AppViewState) and return Lit `html` templates.
 
 **Controller pattern**: `ui/src/ui/controllers/` files handle RPC calls to the gateway and state mutations. They receive the app state object and mutate it directly (Lit reactivity).
+
+**Copy conventions**: All user-facing strings live in `ui/src/ui/copy/` files. No jargon (hash/checksum/manifest/Ollama/LLM). "Safety Report" never "receipt". Copy-only, never deletes originals. Middle-school reading level.
 
 ## Tech Stack
 
