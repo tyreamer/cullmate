@@ -21,7 +21,7 @@ describe("verify", () => {
   let tmpDir: string;
 
   beforeAll(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "cullmate-verify-test-"));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "baxbot-verify-test-"));
   });
 
   afterAll(async () => {

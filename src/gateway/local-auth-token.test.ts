@@ -8,7 +8,7 @@ describe("local-auth-token", () => {
   let tmpDir: string;
 
   beforeAll(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "cullmate-auth-test-"));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "baxbot-auth-test-"));
   });
   afterAll(async () => {
     await fs.rm(tmpDir, { recursive: true, force: true });

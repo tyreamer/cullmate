@@ -15,6 +15,7 @@ import type {
 import type { SkillMessage } from "./controllers/skills.ts";
 import type { StorageConfig } from "./controllers/storage.ts";
 import type { TimelineEntry } from "./controllers/studio-manager.ts";
+import type { StudioProfile } from "./controllers/studio-profile.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
 import type { UiSettings } from "./storage.ts";
@@ -108,7 +109,15 @@ export type AppViewState = {
   smartOrganizerDevInfo: string | null;
   // Studio Manager timeline
   studioTimeline: TimelineEntry[];
+  studioFormValues: Record<string, string>;
+  studioIngestPendingSource: SuggestedSource | null;
   handleStudioAction: (action: string) => void;
+  handleStudioFormValueChange: (fieldId: string, value: string) => void;
+  handleStudioFormSubmit: (fieldId: string, value: string) => void;
+  // Studio Profile
+  studioProfile: StudioProfile;
+  isStudioProfileOpen: boolean;
+  handleSaveStudioProfile: (profile: StudioProfile) => void;
   // Settings sheet (normal mode overlay)
   isSettingsSheetOpen: boolean;
   // Storage setup state

@@ -83,6 +83,7 @@ import { renderSettingsView } from "./views/settings.ts";
 import { renderSkills } from "./views/skills.ts";
 import { renderStorageSetup } from "./views/storage-setup.ts";
 import { renderStudioManager } from "./views/studio-manager.ts";
+import { renderStudioProfileSetup } from "./views/studio-profile-setup.ts";
 
 const ADVANCED_TABS = new Set<Tab>([
   "overview",
@@ -164,6 +165,26 @@ export function renderApp(state: AppViewState) {
     });
   }
 
+  // Gate: show studio profile setup when explicitly opened
+  if (state.isStudioProfileOpen) {
+    return renderStudioProfileSetup({
+      profile: state.studioProfile,
+      onSave: (p) => state.handleSaveStudioProfile(p),
+      onSkip: !state.studioProfile.completedSetup
+        ? () => {
+            state.handleSaveStudioProfile({
+              ...state.studioProfile,
+              enabled: false,
+              completedSetup: true,
+            });
+          }
+        : undefined,
+      onCancel: state.studioProfile.completedSetup
+        ? () => (state.isStudioProfileOpen = false)
+        : undefined,
+    });
+  }
+
   const presenceCount = state.presenceEntries.length;
   const sessionsCount = state.sessionsResult?.count ?? null;
   const cronNext = state.cronStatus?.nextWakeAtMs ?? null;
@@ -190,10 +211,10 @@ export function renderApp(state: AppViewState) {
         <div class="topbar-left">
           <div class="brand">
             <div class="brand-logo">
-              <img src=${basePath ? `${basePath}/favicon.svg` : "/favicon.svg"} alt="Cullmate" />
+              <img src=${basePath ? `${basePath}/logo.png` : "/logo.png"} alt="BaxBot" />
             </div>
             <div class="brand-text">
-              <div class="brand-title">CULLMATE</div>
+              <div class="brand-title">BAXBOT</div>
             </div>
           </div>
           ${
@@ -358,7 +379,11 @@ export function renderApp(state: AppViewState) {
             ? renderStudioManager({
                 connected: state.connected,
                 timeline: state.studioTimeline,
+                formValues: state.studioFormValues,
                 onAction: (action) => state.handleStudioAction(action),
+                onFormValueChange: (fieldId, value) =>
+                  state.handleStudioFormValueChange(fieldId, value),
+                onFormSubmit: (fieldId, value) => state.handleStudioFormSubmit(fieldId, value),
               })
             : nothing
         }
@@ -418,9 +443,15 @@ export function renderApp(state: AppViewState) {
                 connected: state.connected,
                 storageConfig: state.storageConfig,
                 folderTemplate: state.folderTemplate,
+                studioProfile: state.studioProfile,
                 onSettingsChange: (next) => state.applySettings(next),
                 onChangeStorage: () => state.handleOpenStorageSetup(),
                 onChangeFolderTemplate: () => state.handleOpenFolderTemplatePicker(),
+                onEditProfile: () => (state.isStudioProfileOpen = true),
+                onToggleProfileEnabled: (enabled) => {
+                  const updated = { ...state.studioProfile, enabled };
+                  state.handleSaveStudioProfile(updated);
+                },
                 onPickFolder: async () => {
                   if (!state.client) {
                     return;
@@ -1246,6 +1277,7 @@ export function renderApp(state: AppViewState) {
                     connected: state.connected,
                     storageConfig: state.storageConfig,
                     folderTemplate: state.folderTemplate,
+                    studioProfile: state.studioProfile,
                     onSettingsChange: (next) => state.applySettings(next),
                     onChangeStorage: () => {
                       state.isSettingsSheetOpen = false;
@@ -1254,6 +1286,14 @@ export function renderApp(state: AppViewState) {
                     onChangeFolderTemplate: () => {
                       state.isSettingsSheetOpen = false;
                       state.handleOpenFolderTemplatePicker();
+                    },
+                    onEditProfile: () => {
+                      state.isSettingsSheetOpen = false;
+                      state.isStudioProfileOpen = true;
+                    },
+                    onToggleProfileEnabled: (enabled) => {
+                      const updated = { ...state.studioProfile, enabled };
+                      state.handleSaveStudioProfile(updated);
                     },
                     onPickFolder: async () => {
                       if (!state.client) {

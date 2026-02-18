@@ -50,7 +50,7 @@ export function formatPathLabel(path: string): string {
     return volume[1];
   }
 
-  // ~/Pictures/Cullmate -> "Pictures/Cullmate"
+  // ~/Pictures/BaxBot -> "Pictures/BaxBot"
   if (path.startsWith("~/")) {
     return path.slice(2);
   }

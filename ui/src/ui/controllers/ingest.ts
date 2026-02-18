@@ -90,6 +90,7 @@ export async function runIngestVerify(
     backup_dest?: string;
     folder_template?: FolderTemplate;
     template_context?: Record<string, string>;
+    xmp_patch?: { creator?: string; rights?: string; webStatement?: string; credit?: string };
   },
 ): Promise<IngestResult> {
   const response = await client.request<{

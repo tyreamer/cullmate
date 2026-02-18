@@ -466,11 +466,11 @@ export function applyCompactionDefaults(cfg: OpenClawConfig): OpenClawConfig {
 }
 
 /**
- * Cullmate local-first defaults.
+ * BaxBot local-first defaults.
  * Applied as a base layer: user config values always win.
  * Disables remote features (update checks, plugins, browser).
  */
-export function applyCullmateDefaults(cfg: OpenClawConfig): OpenClawConfig {
+export function applyBaxBotDefaults(cfg: OpenClawConfig): OpenClawConfig {
   let next = { ...cfg };
 
   // Disable update checks unless explicitly configured

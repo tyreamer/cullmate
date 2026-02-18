@@ -94,6 +94,11 @@ import {
   ALL_PRESETS,
 } from "./controllers/folder-template.ts";
 import { loadStorageConfig, saveStorageConfig, type StorageConfig } from "./controllers/storage.ts";
+import {
+  loadStudioProfile,
+  saveStudioProfile,
+  type StudioProfile,
+} from "./controllers/studio-profile.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
 
@@ -221,8 +226,15 @@ export class OpenClawApp extends LitElement {
   @state() storageSetupPrimaryDest = "";
   @state() storageSetupBackupDest = "";
 
+  // Studio Profile
+  @state() studioProfile: StudioProfile = loadStudioProfile();
+  @state() isStudioProfileOpen = false;
+
   // Studio Manager timeline
   @state() studioTimeline: TimelineEntry[] = [];
+  @state() studioFormValues: Record<string, string> = {};
+  @state() studioIngestPendingSource: import("./controllers/ingest.ts").SuggestedSource | null =
+    null;
   // Settings sheet (normal mode overlay)
   @state() isSettingsSheetOpen = false;
 
@@ -662,7 +674,7 @@ export class OpenClawApp extends LitElement {
     this.ingestStage = "prompting";
     this.ingestSourcePath = "";
     this.ingestDestPath =
-      this.storageConfig?.primaryDest || this.settings.defaultSaveLocation || "~/Pictures/Cullmate";
+      this.storageConfig?.primaryDest || this.settings.defaultSaveLocation || "~/Pictures/BaxBot";
     this.ingestProjectName = "";
     this.ingestVerifyMode = this.settings.defaultVerifyMode || "none";
     this.ingestDedupeEnabled = false;
@@ -748,6 +760,14 @@ export class OpenClawApp extends LitElement {
     this.ingestError = null;
     this.lastProgressUpdateAt = 0;
     try {
+      const xmpPatch = this.studioProfile.enabled
+        ? {
+            creator: this.studioProfile.displayName || undefined,
+            rights: this.studioProfile.copyrightLine || undefined,
+            credit: this.studioProfile.studioName || undefined,
+            webStatement: this.studioProfile.website || undefined,
+          }
+        : undefined;
       const { runIngestVerify, saveRecentProject } = await import("./controllers/ingest.ts");
       const result = await runIngestVerify(this.client, {
         source_path: this.ingestSourcePath.trim(),
@@ -759,6 +779,7 @@ export class OpenClawApp extends LitElement {
         dedupe: this.ingestDedupeEnabled,
         backup_dest: this.storageConfig?.backupDest || undefined,
         folder_template: this.folderTemplate ?? undefined,
+        xmp_patch: xmpPatch,
       });
       this.ingestResult = result;
       this.ingestStage = "done";
@@ -1048,6 +1069,12 @@ export class OpenClawApp extends LitElement {
     }
   }
 
+  handleSaveStudioProfile(profile: StudioProfile) {
+    saveStudioProfile(profile);
+    this.studioProfile = profile;
+    this.isStudioProfileOpen = false;
+  }
+
   async handleStoragePickPrimary() {
     if (!this.client) {
       return;
@@ -1121,6 +1148,16 @@ export class OpenClawApp extends LitElement {
 
   // Studio Manager
 
+  handleStudioFormValueChange(fieldId: string, value: string) {
+    this.studioFormValues = { ...this.studioFormValues, [fieldId]: value };
+  }
+
+  handleStudioFormSubmit(fieldId: string, value: string) {
+    if (fieldId === "project-name" && this.studioIngestPendingSource) {
+      void this.handleStudioIngestWithName(this.studioIngestPendingSource, value);
+    }
+  }
+
   handleStudioAction(action: string) {
     switch (action) {
       case "open-storage-setup":
@@ -1129,6 +1166,19 @@ export class OpenClawApp extends LitElement {
       case "open-template-picker":
       case "open-template-describe":
         this.handleOpenFolderTemplatePicker();
+        break;
+      case "open-profile-setup":
+      case "edit-profile":
+        this.isStudioProfileOpen = true;
+        break;
+      case "skip-profile-setup":
+        this.studioProfile = {
+          ...this.studioProfile,
+          enabled: false,
+          completedSetup: true,
+        };
+        saveStudioProfile(this.studioProfile);
+        this.rebuildStudioTimeline();
         break;
       case "open-import":
         if (this.settings.developerMode) {
@@ -1146,7 +1196,19 @@ export class OpenClawApp extends LitElement {
           if (this.settings.developerMode) {
             this.handleIngestSelectSuggestedSource(this.ingestSuggestedSources[0]);
           } else {
-            void this.handleStudioIngestFromSource(this.ingestSuggestedSources[0]);
+            // Show naming form before starting ingest
+            this.studioIngestPendingSource = this.ingestSuggestedSources[0];
+            const smartName = suggestProjectNameClient(this.studioIngestPendingSource.path);
+            this.studioFormValues = { ...this.studioFormValues, "project-name": smartName };
+            void import("./controllers/studio-manager.ts").then(({ buildNamingTimeline }) => {
+              this.studioTimeline = buildNamingTimeline({
+                sourceLabel:
+                  this.studioIngestPendingSource?.label ||
+                  this.studioIngestPendingSource?.path ||
+                  "",
+                smartSuggestion: smartName,
+              });
+            });
           }
         }
         break;
@@ -1169,8 +1231,20 @@ export class OpenClawApp extends LitElement {
       case "studio-reveal-project":
         void this.handleIngestRevealProject();
         break;
+      case "studio-import-lightroom":
+        // Lightroom import — reveal project folder for now
+        void this.handleIngestRevealProject();
+        break;
       default:
-        if (action.startsWith("open-recent:")) {
+        if (action.startsWith("select-layout:")) {
+          const templateId = action.slice("select-layout:".length);
+          const preset = ALL_PRESETS.find((p) => p.template_id === templateId);
+          if (preset) {
+            saveFolderTemplate(preset);
+            this.folderTemplate = preset;
+            this.rebuildStudioTimeline();
+          }
+        } else if (action.startsWith("open-recent:")) {
           const root = action.slice("open-recent:".length);
           if (this.client) {
             void import("./controllers/ingest.ts").then(({ openPath: op }) => {
@@ -1223,6 +1297,14 @@ export class OpenClawApp extends LitElement {
     this.lastProgressUpdateAt = 0;
 
     try {
+      const xmpPatch = this.studioProfile.enabled
+        ? {
+            creator: this.studioProfile.displayName || undefined,
+            rights: this.studioProfile.copyrightLine || undefined,
+            credit: this.studioProfile.studioName || undefined,
+            webStatement: this.studioProfile.website || undefined,
+          }
+        : undefined;
       const { runIngestVerify, saveRecentProject } = await import("./controllers/ingest.ts");
       const result = await runIngestVerify(this.client, {
         source_path: sourcePath,
@@ -1234,6 +1316,7 @@ export class OpenClawApp extends LitElement {
         dedupe: false,
         backup_dest: this.storageConfig.backupDest || undefined,
         folder_template: this.folderTemplate ?? undefined,
+        xmp_patch: xmpPatch,
       });
 
       this.ingestResult = result;
@@ -1305,6 +1388,146 @@ export class OpenClawApp extends LitElement {
     }
   }
 
+  /**
+   * Inline ingest with user-provided project name (from the naming form).
+   */
+  async handleStudioIngestWithName(
+    source: import("./controllers/ingest.ts").SuggestedSource,
+    projectName: string,
+  ) {
+    if (!this.client || !this.storageConfig) {
+      return;
+    }
+
+    // Clear pending state
+    this.studioIngestPendingSource = null;
+    this.studioFormValues = {};
+
+    const sourcePath = source.path;
+    const destPath = this.storageConfig.primaryDest;
+    const trimmedName = projectName.trim() || suggestProjectNameClient(sourcePath);
+    const { COPY } = await import("./copy/studio-manager-copy.ts");
+
+    // Replace the action cards with a status card
+    this.studioTimeline = [
+      {
+        kind: "text" as const,
+        id: "ingest-started",
+        role: "cullmate" as const,
+        body: `Saving photos from ${source.label || sourcePath.split("/").pop() || sourcePath}\u2026`,
+      },
+      {
+        kind: "status" as const,
+        id: "ingest-progress",
+        role: "cullmate" as const,
+        statusLine: COPY.statusScanning,
+        progressPercent: 0,
+      },
+    ];
+
+    // Track progress in the timeline
+    this.ingestStage = "running";
+    this.ingestSourcePath = sourcePath;
+    this.ingestDestPath = destPath;
+    this.ingestProjectName = trimmedName;
+    this.ingestProgress = null;
+    this.ingestError = null;
+    this.lastProgressUpdateAt = 0;
+
+    try {
+      const xmpPatch = this.studioProfile.enabled
+        ? {
+            creator: this.studioProfile.displayName || undefined,
+            rights: this.studioProfile.copyrightLine || undefined,
+            credit: this.studioProfile.studioName || undefined,
+            webStatement: this.studioProfile.website || undefined,
+          }
+        : undefined;
+      const { runIngestVerify, saveRecentProject } = await import("./controllers/ingest.ts");
+      const result = await runIngestVerify(this.client, {
+        source_path: sourcePath,
+        dest_project_path: destPath,
+        project_name: trimmedName,
+        verify_mode: this.settings.defaultVerifyMode || "none",
+        hash_algo: "blake3",
+        overwrite: false,
+        dedupe: false,
+        backup_dest: this.storageConfig.backupDest || undefined,
+        folder_template: this.folderTemplate ?? undefined,
+        xmp_patch: xmpPatch,
+      });
+
+      this.ingestResult = result;
+      this.ingestStage = "done";
+
+      if (result.ok && result.project_root) {
+        saveRecentProject({
+          projectName: trimmedName,
+          projectRoot: result.project_root,
+          reportPath: result.report_path,
+          destPath,
+          sourcePath,
+          timestamp: Date.now(),
+        });
+      }
+
+      // Show project card with shoot name as headline
+      const safeToFormat = result.safe_to_format ?? null;
+      this.studioTimeline = [
+        {
+          kind: "text" as const,
+          id: "ingest-started",
+          role: "cullmate" as const,
+          body: COPY.statusDone,
+        },
+        {
+          kind: "result" as const,
+          id: "ingest-result",
+          role: "cullmate" as const,
+          safeToFormat,
+          headline: trimmedName,
+          verdict: safeToFormat ? COPY.safeToFormatYes : COPY.safeToFormatNotYet,
+          detail: safeToFormat ? COPY.safeToFormatYesDetail : COPY.safeToFormatNoDetail,
+          buttons: [
+            { label: COPY.openFolder, action: "studio-reveal-project" },
+            { label: COPY.openSafetyReport, action: "studio-open-report" },
+            { label: COPY.importToLightroom, action: "studio-import-lightroom" },
+          ],
+          counters: result.totals
+            ? [
+                { label: "Copied", value: String(result.totals.success_count) },
+                ...(result.totals.total_bytes
+                  ? [{ label: "Size", value: formatBytesSimple(result.totals.total_bytes) }]
+                  : []),
+                ...(result.totals.fail_count > 0
+                  ? [{ label: "Failed", value: String(result.totals.fail_count) }]
+                  : []),
+              ]
+            : [],
+        },
+      ];
+    } catch (err) {
+      this.ingestError = err instanceof Error ? err.message : String(err);
+      this.ingestStage = "error";
+
+      this.studioTimeline = [
+        {
+          kind: "text" as const,
+          id: "ingest-error",
+          role: "cullmate" as const,
+          body: `Something went wrong: ${this.ingestError}`,
+        },
+        {
+          kind: "action" as const,
+          id: "import-retry",
+          role: "cullmate" as const,
+          title: "Try again?",
+          primaryButton: { label: COPY.savePhotosSafely, action: "import-detected" },
+        },
+      ];
+    }
+  }
+
   rebuildStudioTimeline() {
     void import("./controllers/studio-manager.ts").then(({ buildStarterTimeline }) => {
       this.studioTimeline = buildStarterTimeline({
@@ -1312,6 +1535,8 @@ export class OpenClawApp extends LitElement {
         recentProjects: this.ingestRecentProjects,
         hasStorageConfig: !!this.storageConfig,
         hasFolderTemplate: !!this.folderTemplate,
+        hasCompletedProfileSetup: this.studioProfile.completedSetup,
+        presets: ALL_PRESETS,
       });
     });
   }

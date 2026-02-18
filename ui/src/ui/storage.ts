@@ -16,6 +16,10 @@ export type UiSettings = {
   developerMode: boolean;
   defaultSaveLocation: string;
   defaultVerifyMode: "none" | "sentinel";
+  copyrightEnabled: boolean;
+  copyrightName: string;
+  copyrightStudio: string;
+  copyrightWebsite: string;
 };
 
 export function loadSettings(): UiSettings {
@@ -36,8 +40,12 @@ export function loadSettings(): UiSettings {
     navCollapsed: false,
     navGroupsCollapsed: {},
     developerMode: false,
-    defaultSaveLocation: "~/Pictures/Cullmate",
+    defaultSaveLocation: "~/Pictures/BaxBot",
     defaultVerifyMode: "none",
+    copyrightEnabled: false,
+    copyrightName: "",
+    copyrightStudio: "",
+    copyrightWebsite: "",
   };
 
   try {
@@ -93,6 +101,20 @@ export function loadSettings(): UiSettings {
         parsed.defaultVerifyMode === "none" || parsed.defaultVerifyMode === "sentinel"
           ? parsed.defaultVerifyMode
           : defaults.defaultVerifyMode,
+      copyrightEnabled:
+        typeof parsed.copyrightEnabled === "boolean"
+          ? parsed.copyrightEnabled
+          : defaults.copyrightEnabled,
+      copyrightName:
+        typeof parsed.copyrightName === "string" ? parsed.copyrightName : defaults.copyrightName,
+      copyrightStudio:
+        typeof parsed.copyrightStudio === "string"
+          ? parsed.copyrightStudio
+          : defaults.copyrightStudio,
+      copyrightWebsite:
+        typeof parsed.copyrightWebsite === "string"
+          ? parsed.copyrightWebsite
+          : defaults.copyrightWebsite,
     };
   } catch {
     return defaults;

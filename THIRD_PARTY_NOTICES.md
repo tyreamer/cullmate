@@ -4,7 +4,7 @@
 
 - License: MIT
 - Source: https://github.com/openclaw/openclaw
-- Cullmate is derived from OpenClaw.
+- BaxBot is derived from OpenClaw.
 
 ## Other Dependencies
 

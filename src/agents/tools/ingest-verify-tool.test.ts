@@ -9,7 +9,7 @@ describe("ingest-verify-tool", () => {
   let tmpDir: string;
 
   beforeAll(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "cullmate-tool-test-"));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "baxbot-tool-test-"));
 
     // Create test source
     const sourceDir = path.join(tmpDir, "source");

@@ -5,13 +5,17 @@ import type {
   ActionCard,
   StatusCard,
   ResultCard,
+  FormCard,
 } from "../controllers/studio-manager.ts";
 import { COPY } from "../copy/studio-manager-copy.ts";
 
 export type StudioManagerViewState = {
   connected: boolean;
   timeline: TimelineEntry[];
+  formValues: Record<string, string>;
   onAction: (action: string) => void;
+  onFormValueChange: (fieldId: string, value: string) => void;
+  onFormSubmit: (fieldId: string, value: string) => void;
 };
 
 // ── Sub-renderers ──
@@ -122,9 +126,20 @@ function renderResultCard(card: ResultCard, state: StudioManagerViewState) {
 
   return html`
     <div class="studio-card studio-card--result studio-card--result-${variant}">
-      <div class="studio-card__result-banner studio-card__result-banner--${variant}">
-        ${card.headline}
-      </div>
+      ${
+        card.verdict
+          ? html`
+            <div class="studio-card__project-name">${card.headline}</div>
+            <div class="studio-card__result-banner studio-card__result-banner--${variant}">
+              ${card.verdict}
+            </div>
+          `
+          : html`
+            <div class="studio-card__result-banner studio-card__result-banner--${variant}">
+              ${card.headline}
+            </div>
+          `
+      }
       <div class="studio-card__desc">${card.detail}</div>
       ${
         card.counters && card.counters.length > 0
@@ -156,6 +171,59 @@ function renderResultCard(card: ResultCard, state: StudioManagerViewState) {
   `;
 }
 
+function renderFormCard(card: FormCard, state: StudioManagerViewState) {
+  const currentValue = state.formValues[card.fieldId] ?? card.defaultValue ?? "";
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      state.onFormSubmit(card.fieldId, currentValue);
+    }
+  };
+
+  return html`
+    <div class="studio-card">
+      <div class="studio-card__title">${card.title}</div>
+      ${
+        card.chips && card.chips.length > 0
+          ? html`
+          <div class="studio-card__chips">
+            ${card.chips.map(
+              (chip) => html`
+                <button
+                  class="chip"
+                  ?disabled=${!state.connected}
+                  @click=${() => state.onFormValueChange(card.fieldId, chip.value)}
+                >${chip.label}</button>
+              `,
+            )}
+          </div>
+        `
+          : nothing
+      }
+      <input
+        class="studio-card__input"
+        type="text"
+        .value=${currentValue}
+        placeholder=${card.placeholder ?? ""}
+        ?disabled=${!state.connected}
+        @input=${(e: InputEvent) => {
+          const target = e.target as HTMLInputElement;
+          state.onFormValueChange(card.fieldId, target.value);
+        }}
+        @keydown=${handleKeyDown}
+      />
+      <div class="studio-card__actions">
+        <button
+          class="btn primary"
+          ?disabled=${!state.connected || !currentValue.trim()}
+          @click=${() => state.onFormSubmit(card.fieldId, currentValue)}
+        >${card.submitButton.label}</button>
+      </div>
+    </div>
+  `;
+}
+
 // ── Main render ──
 
 export function renderStudioManager(state: StudioManagerViewState) {
@@ -182,6 +250,8 @@ export function renderStudioManager(state: StudioManagerViewState) {
               return renderStatusCard(entry);
             case "result":
               return renderResultCard(entry, state);
+            case "form":
+              return renderFormCard(entry, state);
           }
         })}
       </div>

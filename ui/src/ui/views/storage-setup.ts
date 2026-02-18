@@ -193,7 +193,7 @@ export function renderStorageSetup(state: StorageSetupState) {
               : nothing
           }
 
-          <p style="font-size: 0.75rem; color: var(--muted); margin: 0;">Cullmate never deletes originals. You'll get a Safety Report when it's safe.</p>
+          <p style="font-size: 0.75rem; color: var(--muted); margin: 0;">BaxBot never deletes originals. You'll get a Safety Report when it's safe.</p>
 
           <div class="exec-approval-actions">
             <button class="btn primary" ?disabled=${!canSave} @click=${() => {

@@ -8,7 +8,7 @@ describe("extractExifInfo", () => {
   let tmpDir: string;
 
   beforeAll(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "cullmate-exif-test-"));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "baxbot-exif-test-"));
   });
 
   afterAll(async () => {

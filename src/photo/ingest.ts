@@ -13,6 +13,7 @@ import { scanSourceFiles } from "./scan.js";
 import { buildTokenContext } from "./template-context.js";
 import { expandTemplate } from "./template-expand.js";
 import { verifyFiles } from "./verify.js";
+import { writeXmpSidecar } from "./xmp/xmp-sidecar.js";
 
 const LEGACY_PROJECT_SUBDIRS = [
   "01_RAW",
@@ -324,6 +325,56 @@ export async function runIngest(
     });
   }
 
+  // ── Phase 1.5: XMP sidecar writing (primary) ──
+  if (params.xmp_patch) {
+    const xmpFiles = files.filter((f) => f.status === "copied");
+    let xmpWritten = 0;
+    let xmpFailed = 0;
+
+    for (let i = 0; i < xmpFiles.length; i++) {
+      const entry = xmpFiles[i];
+      try {
+        const mediaAbsPath = path.join(projectRoot, entry.dst_rel);
+        const result = await writeXmpSidecar(mediaAbsPath, params.xmp_patch);
+        entry.sidecar_written = result.written;
+        // Store relative sidecar path
+        const relSidecar = path.relative(projectRoot, result.sidecarPath);
+        entry.sidecar_path = relSidecar;
+        if (result.error) {
+          entry.sidecar_error = result.error;
+        }
+        if (result.written) {
+          xmpWritten++;
+        } else {
+          xmpFailed++;
+        }
+      } catch (err) {
+        entry.sidecar_written = false;
+        entry.sidecar_error = err instanceof Error ? err.message : String(err);
+        xmpFailed++;
+      }
+
+      if (onProgress && (i + 1) % 10 === 0) {
+        onProgress({
+          type: "ingest.xmp.progress",
+          written_count: xmpWritten,
+          failed_count: xmpFailed,
+          total: xmpFiles.length,
+        });
+      }
+    }
+
+    // Final XMP progress event
+    if (onProgress && xmpFiles.length > 0) {
+      onProgress({
+        type: "ingest.xmp.progress",
+        written_count: xmpWritten,
+        failed_count: xmpFailed,
+        total: xmpFiles.length,
+      });
+    }
+  }
+
   // ── Phase 2: Primary verify ──
   if (params.verify_mode !== "none") {
     await verifyFiles(files, projectRoot, params.hash_algo, params.verify_mode, onProgress);
@@ -368,6 +419,20 @@ export async function runIngest(
         bytes_copied: result.bytes,
         total_bytes_copied: backupBytesCopied,
       });
+    }
+
+    // ── Phase 3.5: Backup XMP sidecar writing ──
+    if (params.xmp_patch) {
+      const backupXmpFiles = filesToBackup.filter((f) => f.backup_status === "copied");
+      for (let i = 0; i < backupXmpFiles.length; i++) {
+        const entry = backupXmpFiles[i];
+        try {
+          const backupMediaPath = path.join(backupProjectRoot, entry.dst_rel);
+          await writeXmpSidecar(backupMediaPath, params.xmp_patch);
+        } catch {
+          // Backup sidecar failures are silently ignored
+        }
+      }
     }
 
     // ── Phase 4: Backup verify ──
@@ -443,6 +508,8 @@ export async function runIngest(
       backup_verified_count: backupVerifiedFiles.length,
       backup_verified_ok: backupVerifiedOk,
       backup_verified_mismatch: backupVerifiedMismatch,
+      xmp_written_count: files.filter((f) => f.sidecar_written === true).length,
+      xmp_failed_count: files.filter((f) => f.sidecar_written === false).length,
     },
     files,
   };

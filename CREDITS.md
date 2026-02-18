@@ -1,6 +1,6 @@
 # Credits
 
-Cullmate is derived from [OpenClaw](https://github.com/openclaw/openclaw) (MIT License).
+BaxBot is derived from [OpenClaw](https://github.com/openclaw/openclaw) (MIT License).
 
 Not affiliated with or endorsed by the OpenClaw project.
 

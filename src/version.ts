@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 
 declare const __CULLMATE_VERSION__: string | undefined;
 declare const __OPENCLAW_VERSION__: string | undefined;
-const CORE_PACKAGE_NAME = "cullmate";
+const CORE_PACKAGE_NAME = "baxbot";
 
 const PACKAGE_JSON_CANDIDATES = [
   "../package.json",

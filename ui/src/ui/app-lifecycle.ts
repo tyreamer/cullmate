@@ -80,7 +80,8 @@ export function handleUpdated(host: LifecycleHost, changed: Map<PropertyKey, unk
     changed.has("ingestSuggestedSources") ||
     changed.has("ingestRecentProjects") ||
     changed.has("storageConfig") ||
-    changed.has("folderTemplate")
+    changed.has("folderTemplate") ||
+    changed.has("studioProfile")
   ) {
     (host as unknown as { rebuildStudioTimeline: () => void }).rebuildStudioTimeline();
   }

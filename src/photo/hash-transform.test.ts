@@ -9,7 +9,7 @@ describe("hash-transform", () => {
   let tmpDir: string;
 
   beforeAll(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "cullmate-hash-test-"));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "baxbot-hash-test-"));
   });
 
   afterAll(async () => {

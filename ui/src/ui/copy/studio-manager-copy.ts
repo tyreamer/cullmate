@@ -11,6 +11,13 @@ export const COPY = {
   organizationDescribeButton: "Describe it",
   readyToImport: "Ready to save your first card.",
 
+  // Studio Profile onboarding
+  profilePrompt: "Want to add your name + website to photos? Helps with sharing later.",
+  profileTitle: "Add Studio Profile",
+  profileButton: "Add Studio Profile",
+  profileSkip: "Skip",
+  profileDone: "Profile saved.",
+
   // Returning user
   detectedSourceBody: (label: string) => `Card detected: ${label}`,
   savePhotosSafely: "Save photos safely",
@@ -32,11 +39,28 @@ export const COPY = {
   safeToFormatNoDetail:
     "Something went wrong during the copy. Check the Safety Report for details.",
   openSafetyReport: "Open Safety Report",
+  openFolder: "Open folder",
   openInFinder: "Show in Finder",
   importToLightroom: "Import to Lightroom",
+
+  // Layout (inline onboarding)
+  layoutPrompt: "Pick a layout for your files",
+  layoutClassicButton: "Use Classic",
+
+  // Studio Profile (inline optional question)
+  profilePromptInline: "Want your studio name added automatically? (Optional)",
+  profileTitleInline: "Studio name on photos",
+  profileTurnOn: "Turn it on",
+  profileNotNow: "Not now",
+
+  // Naming step
+  namingPrompt: "What\u2019s this shoot called?",
+  namingTitle: "Name this project",
+  namingPlaceholder: "e.g. Josh & Kelly \u2014 Swan Point",
+  savePhotosButton: "Save photos",
 
   // Affordances
   showDetails: "Show details",
   hideDetails: "Hide details",
-  disconnectedMessage: "Connecting to Cullmate\u2026",
+  disconnectedMessage: "Connecting to BaxBot\u2026",
 } as const;

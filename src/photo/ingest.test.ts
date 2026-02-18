@@ -13,7 +13,7 @@ describe("ingest integration", () => {
   let destDir: string;
 
   beforeAll(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "cullmate-ingest-test-"));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "baxbot-ingest-test-"));
     sourceDir = path.join(tmpDir, "source");
     destDir = path.join(tmpDir, "output");
 
@@ -107,7 +107,7 @@ describe("ingest integration", () => {
 
     // Report HTML contains key info
     const reportHtml = await fs.readFile(manifest.report_path!, "utf-8");
-    expect(reportHtml).toContain("Cullmate Safety Report");
+    expect(reportHtml).toContain("BaxBot Safety Report");
     expect(reportHtml).toContain("TestShoot");
     expect(reportHtml).toContain("IMG_001.jpg");
 
@@ -686,6 +686,82 @@ describe("ingest integration", () => {
     await expect(
       fs.stat(path.join(backupDest, "BackupTemplateTest", "EXPORTS")),
     ).resolves.toBeTruthy();
+  });
+
+  it("writes XMP sidecars when xmp_patch is provided", async () => {
+    const freshDest = path.join(tmpDir, "output-xmp");
+
+    const manifest = await runIngest({
+      source_path: sourceDir,
+      dest_project_path: freshDest,
+      project_name: "XmpTest",
+      verify_mode: "none",
+      overwrite: false,
+      hash_algo: "sha256",
+      xmp_patch: {
+        creator: "Jane Doe",
+        rights: "\u00A9 2026 Jane Doe",
+        credit: "JD Photography",
+        webStatement: "https://janedoe.com",
+      },
+    });
+
+    const projectRoot = path.join(freshDest, "XmpTest");
+
+    // All files copied
+    expect(manifest.totals.success_count).toBe(5);
+
+    // XMP totals
+    expect(manifest.totals.xmp_written_count).toBe(5);
+    expect(manifest.totals.xmp_failed_count).toBe(0);
+
+    // Each copied file has sidecar fields
+    for (const file of manifest.files) {
+      expect(file.sidecar_written).toBe(true);
+      expect(file.sidecar_path).toBeTruthy();
+      expect(file.sidecar_error).toBeUndefined();
+    }
+
+    // .xmp files exist on disk next to media files
+    const jpgEntry = manifest.files.find((f) => f.src_rel.endsWith("IMG_001.jpg"));
+    expect(jpgEntry).toBeTruthy();
+    const sidecarAbsPath = path.join(projectRoot, jpgEntry!.sidecar_path!);
+    await expect(fs.stat(sidecarAbsPath)).resolves.toBeTruthy();
+
+    // XMP file content is valid
+    const xmpContent = await fs.readFile(sidecarAbsPath, "utf-8");
+    expect(xmpContent).toContain("<dc:creator>");
+    expect(xmpContent).toContain("Jane Doe");
+    expect(xmpContent).toContain("\u00A9 2026 Jane Doe");
+    expect(xmpContent).toContain('photoshop:Credit="JD Photography"');
+    expect(xmpContent).toContain('xmpRights:WebStatement="https://janedoe.com"');
+
+    // Report contains photo info summary
+    const reportHtml = await fs.readFile(manifest.report_path!, "utf-8");
+    expect(reportHtml).toContain("Photo info added");
+  });
+
+  it("does not write XMP sidecars when xmp_patch is omitted", async () => {
+    const freshDest = path.join(tmpDir, "output-no-xmp");
+
+    const manifest = await runIngest({
+      source_path: sourceDir,
+      dest_project_path: freshDest,
+      project_name: "NoXmpTest",
+      verify_mode: "none",
+      overwrite: false,
+      hash_algo: "sha256",
+    });
+
+    expect(manifest.totals.success_count).toBe(5);
+    expect(manifest.totals.xmp_written_count).toBe(0);
+    expect(manifest.totals.xmp_failed_count).toBe(0);
+
+    // No sidecar fields set on files
+    for (const file of manifest.files) {
+      expect(file.sidecar_written).toBeUndefined();
+      expect(file.sidecar_path).toBeUndefined();
+    }
   });
 
   it("stores template_id in manifest", async () => {

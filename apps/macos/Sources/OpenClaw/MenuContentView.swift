@@ -42,7 +42,7 @@ struct MenuContent: View {
         VStack(alignment: .leading, spacing: 8) {
             // Status header
             VStack(alignment: .leading, spacing: 2) {
-                Text("Cullmate")
+                Text("BaxBot")
                     .font(.headline)
                 self.statusLine(label: self.gatewayStatusLabel, color: self.gatewayStatusColor)
             }
@@ -62,7 +62,7 @@ struct MenuContent: View {
                     await self.openDashboard()
                 }
             } label: {
-                Label("Open Cullmate", systemImage: "gauge")
+                Label("Open BaxBot", systemImage: "gauge")
             }
             Button {
                 Task { @MainActor in
@@ -93,7 +93,7 @@ struct MenuContent: View {
             Button("Settings\u{2026}") { self.open(tab: .general) }
                 .keyboardShortcut(",", modifiers: [.command])
             self.debugMenu
-            Button("About Cullmate") { self.open(tab: .about) }
+            Button("About BaxBot") { self.open(tab: .about) }
             if let updater, updater.isAvailable, self.updateStatus.isUpdateReady {
                 Button("Update ready, restart now?") { updater.checkForUpdates(nil) }
             }
@@ -166,11 +166,11 @@ struct MenuContent: View {
     private var connectionLabel: String {
         switch self.state.connectionMode {
         case .unconfigured:
-            "Cullmate"
+            "BaxBot"
         case .remote:
-            "Cullmate (Remote)"
+            "BaxBot (Remote)"
         case .local:
-            "Cullmate"
+            "BaxBot"
         }
     }
 
@@ -322,7 +322,7 @@ struct MenuContent: View {
             NSWorkspace.shared.open(url)
         } catch {
             let alert = NSAlert()
-            alert.messageText = "Cullmate unavailable"
+            alert.messageText = "BaxBot unavailable"
             alert.informativeText = error.localizedDescription
             alert.runModal()
         }
@@ -348,7 +348,7 @@ struct MenuContent: View {
             NSWorkspace.shared.open(url)
         } catch {
             let alert = NSAlert()
-            alert.messageText = "Cullmate unavailable"
+            alert.messageText = "BaxBot unavailable"
             alert.informativeText = error.localizedDescription
             alert.runModal()
         }

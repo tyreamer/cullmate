@@ -29,7 +29,7 @@ const compilerProcess = spawn("pnpm", ["exec", compiler, "--watch"], {
   stdio: "inherit",
 });
 
-const nodeProcess = spawn(process.execPath, ["--watch", "cullmate.mjs", ...args], {
+const nodeProcess = spawn(process.execPath, ["--watch", "baxbot.mjs", ...args], {
   cwd,
   env,
   stdio: "inherit",

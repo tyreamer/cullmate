@@ -7,11 +7,11 @@
     <key>CFBundleExecutable</key>
     <string>OpenClaw</string>
     <key>CFBundleIdentifier</key>
-    <string>ai.cullmate.mac</string>
+    <string>ai.baxbot.mac</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>Cullmate</string>
+    <string>BaxBot</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -42,23 +42,23 @@
     <string></string>
 
     <key>NSUserNotificationUsageDescription</key>
-    <string>Cullmate needs notification permission to show alerts for agent actions.</string>
+    <string>BaxBot needs notification permission to show alerts for agent actions.</string>
     <key>NSScreenCaptureDescription</key>
-    <string>Cullmate captures the screen when the agent needs screenshots for context.</string>
+    <string>BaxBot captures the screen when the agent needs screenshots for context.</string>
     <key>NSCameraUsageDescription</key>
-    <string>Cullmate can capture photos or short video clips when requested by the agent.</string>
+    <string>BaxBot can capture photos or short video clips when requested by the agent.</string>
 	<key>NSLocationUsageDescription</key>
-	<string>Cullmate can share your location when requested by the agent.</string>
+	<string>BaxBot can share your location when requested by the agent.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Cullmate can share your location when requested by the agent.</string>
+	<string>BaxBot can share your location when requested by the agent.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Cullmate can share your location when requested by the agent.</string>
+	<string>BaxBot can share your location when requested by the agent.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Cullmate needs the mic for Voice Wake tests and agent audio capture.</string>
+	<string>BaxBot needs the mic for Voice Wake tests and agent audio capture.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>Cullmate uses speech recognition to detect your Voice Wake trigger phrase.</string>
+    <string>BaxBot uses speech recognition to detect your Voice Wake trigger phrase.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Cullmate needs Automation (AppleScript) permission to drive Terminal and other apps for agent actions.</string>
+    <string>BaxBot needs Automation (AppleScript) permission to drive Terminal and other apps for agent actions.</string>
 
     <key>NSAppTransportSecurity</key>
     <dict>

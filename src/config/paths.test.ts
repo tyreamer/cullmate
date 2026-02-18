@@ -105,7 +105,7 @@ describe("state + config path candidates", () => {
   });
 
   it("prefers ~/.cullmate when it exists and legacy dir is missing", async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "cullmate-state-"));
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "baxbot-state-"));
     try {
       const newDir = path.join(root, ".cullmate");
       await fs.mkdir(newDir, { recursive: true });
@@ -117,7 +117,7 @@ describe("state + config path candidates", () => {
   });
 
   it("falls back to ~/.openclaw when it exists and .cullmate is missing", async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "cullmate-state-legacy-"));
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "baxbot-state-legacy-"));
     try {
       const legacyDir = path.join(root, ".openclaw");
       await fs.mkdir(legacyDir, { recursive: true });
@@ -129,7 +129,7 @@ describe("state + config path candidates", () => {
   });
 
   it("CONFIG_PATH prefers existing config when present", async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "cullmate-config-"));
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "baxbot-config-"));
     try {
       const dir = path.join(root, ".cullmate");
       await fs.mkdir(dir, { recursive: true });
@@ -144,7 +144,7 @@ describe("state + config path candidates", () => {
   });
 
   it("respects state dir overrides when config is missing", async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "cullmate-config-override-"));
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "baxbot-config-override-"));
     try {
       const dir = path.join(root, ".cullmate");
       await fs.mkdir(dir, { recursive: true });

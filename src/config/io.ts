@@ -17,7 +17,7 @@ import { VERSION } from "../version.js";
 import { DuplicateAgentDirError, findDuplicateAgentDirs } from "./agent-dirs.js";
 import { rotateConfigBackups } from "./backup-rotation.js";
 import {
-  applyCullmateDefaults,
+  applyBaxBotDefaults,
   applyCompactionDefaults,
   applyContextPruningDefaults,
   applyAgentDefaults,
@@ -540,7 +540,7 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
             timeoutMs: resolveShellEnvFallbackTimeoutMs(deps.env),
           });
         }
-        return applyCullmateDefaults({});
+        return applyBaxBotDefaults({});
       }
       const raw = deps.fs.readFileSync(configPath, "utf-8");
       const parsed = deps.json5.parse(raw);
@@ -580,7 +580,7 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
         deps.logger.warn(`Config warnings:\\n${details}`);
       }
       warnIfConfigFromFuture(validated.config, deps.logger);
-      const cfg = applyCullmateDefaults(
+      const cfg = applyBaxBotDefaults(
         applyModelDefaults(
           applyCompactionDefaults(
             applyContextPruningDefaults(
@@ -634,7 +634,7 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
     const exists = deps.fs.existsSync(configPath);
     if (!exists) {
       const hash = hashConfigRaw(null);
-      const config = applyCullmateDefaults(
+      const config = applyBaxBotDefaults(
         applyTalkApiKey(
           applyModelDefaults(
             applyCompactionDefaults(

@@ -1,7 +1,8 @@
 import { replaceCliName, resolveCliName } from "./cli-name.js";
 import { normalizeProfileName } from "./profile-utils.js";
 
-const CLI_PREFIX_RE = /^(?:pnpm|npm|bunx|npx)\s+(?:cullmate|openclaw)\b|^(?:cullmate|openclaw)\b/;
+const CLI_PREFIX_RE =
+  /^(?:pnpm|npm|bunx|npx)\s+(?:baxbot|cullmate|openclaw)\b|^(?:baxbot|cullmate|openclaw)\b/;
 const PROFILE_FLAG_RE = /(?:^|\s)--profile(?:\s|=|$)/;
 const DEV_FLAG_RE = /(?:^|\s)--dev(?:\s|$)/;
 

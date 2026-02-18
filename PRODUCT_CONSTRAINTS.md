@@ -1,4 +1,4 @@
-# Cullmate Frictionless Contract
+# BaxBot Frictionless Contract
 
 Every release must satisfy all eight constraints. If a constraint cannot be met, the feature ships disabled or deferred.
 

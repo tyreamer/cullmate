@@ -1,4 +1,5 @@
 import type { FolderTemplate, MediaType } from "./folder-template.js";
+import type { XmpPatch } from "./xmp/xmp-sidecar.js";
 
 export type VerifyMode = "none" | "sentinel" | "full";
 
@@ -13,6 +14,7 @@ export type IngestParams = {
   backup_dest?: string; // backup destination parent directory
   folder_template?: FolderTemplate;
   template_context?: Record<string, string>; // user-provided: CLIENT, JOB, etc.
+  xmp_patch?: XmpPatch;
 };
 
 export type FileStatus = "copied" | "skipped_exists" | "skipped_duplicate" | "error";
@@ -29,6 +31,10 @@ export type FileEntry = {
   verified?: boolean; // true=match, false=mismatch, undefined=not checked
   media_type?: MediaType;
   routed_by?: string; // label of matching routing rule
+  // XMP sidecar fields
+  sidecar_written?: boolean; // true if .xmp was written successfully
+  sidecar_path?: string; // relative path of the .xmp sidecar
+  sidecar_error?: string; // error message if sidecar write failed
   // Backup copy fields (only present when backup_dest is set)
   backup_status?: FileStatus;
   backup_hash?: string; // hex digest from backup copy pass
@@ -70,6 +76,8 @@ export type IngestManifest = {
     backup_verified_count: number;
     backup_verified_ok: number;
     backup_verified_mismatch: number;
+    xmp_written_count: number;
+    xmp_failed_count: number;
   };
   files: FileEntry[];
 };
@@ -113,6 +121,12 @@ export type IngestProgressEvent =
       mode: VerifyMode;
       verified_count: number;
       verified_total: number;
+    }
+  | {
+      type: "ingest.xmp.progress";
+      written_count: number;
+      failed_count: number;
+      total: number;
     }
   | {
       type: "ingest.report.generated";

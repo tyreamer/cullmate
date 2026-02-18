@@ -1,6 +1,6 @@
 # Release Checklist
 
-Before every Cullmate release, verify each item:
+Before every BaxBot release, verify each item:
 
 - [ ] App launches and operates fully offline (no network connection)
 - [ ] No API keys or accounts required for core functionality

@@ -216,6 +216,38 @@
   color: var(--danger);
 }
 
+/* ── Form card input ── */
+
+.studio-card__input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  color: var(--text);
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.studio-card__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.studio-card__input::placeholder {
+  color: var(--muted);
+}
+
+/* ── Project name (result card with verdict) ── */
+
+.studio-card__project-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: -0.02em;
+}
+
 /* ── Gear button ── */
 
 .studio-gear-btn {

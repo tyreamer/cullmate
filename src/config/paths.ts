@@ -5,7 +5,7 @@ import type { OpenClawConfig } from "./types.js";
 import { expandHomePrefix, resolveRequiredHomeDir } from "../infra/home-dir.js";
 
 /**
- * Nix mode detection: When CULLMATE_NIX_MODE=1 (or OPENCLAW_NIX_MODE=1), the gateway is running under Nix.
+ * Nix mode detection: When CULLMATE_NIX_MODE=1 (or OPENCLAW_NIX_MODE=1), the gateway is running under Nix (BaxBot).
  * In this mode:
  * - No auto-install flows should be attempted
  * - Missing dependencies should produce actionable Nix-specific error messages
@@ -32,7 +32,7 @@ function resolveDefaultHomeDir(): string {
   return resolveRequiredHomeDir(process.env, os.homedir);
 }
 
-/** Build a homedir thunk that respects CULLMATE_HOME / OPENCLAW_HOME for the given env. */
+/** Build a homedir thunk that respects CULLMATE_HOME / OPENCLAW_HOME for the given env (BaxBot). */
 function envHomedir(env: NodeJS.ProcessEnv): () => string {
   return () => resolveRequiredHomeDir(env, os.homedir);
 }
@@ -60,7 +60,7 @@ export function resolveNewStateDir(homedir: () => string = resolveDefaultHomeDir
 /**
  * State directory for mutable data (sessions, logs, caches).
  * Can be overridden via CULLMATE_STATE_DIR (or OPENCLAW_STATE_DIR for legacy).
- * Default: ~/.cullmate
+ * Default: ~/.cullmate (BaxBot state directory)
  */
 export function resolveStateDir(
   env: NodeJS.ProcessEnv = process.env,
@@ -118,7 +118,7 @@ export const STATE_DIR = resolveStateDir();
 /**
  * Config file path (JSON5).
  * Can be overridden via CULLMATE_CONFIG_PATH (or OPENCLAW_CONFIG_PATH for legacy).
- * Default: ~/.cullmate/cullmate.json
+ * Default: ~/.cullmate/cullmate.json (BaxBot config)
  */
 export function resolveCanonicalConfigPath(
   env: NodeJS.ProcessEnv = process.env,
@@ -235,12 +235,12 @@ export const DEFAULT_GATEWAY_PORT = 18789;
 
 /**
  * Gateway lock directory (ephemeral).
- * Default: os.tmpdir()/cullmate-<uid> (uid suffix when available).
+ * Default: os.tmpdir()/baxbot-<uid> (uid suffix when available).
  */
 export function resolveGatewayLockDir(tmpdir: () => string = os.tmpdir): string {
   const base = tmpdir();
   const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
-  const suffix = uid != null ? `cullmate-${uid}` : "cullmate";
+  const suffix = uid != null ? `baxbot-${uid}` : "baxbot";
   return path.join(base, suffix);
 }
 

@@ -104,60 +104,60 @@ describe("applyCliProfileEnv", () => {
 
 describe("formatCliCommand", () => {
   it("returns command unchanged when no profile is set", () => {
-    expect(formatCliCommand("cullmate doctor --fix", {})).toBe("cullmate doctor --fix");
+    expect(formatCliCommand("cullmate doctor --fix", {})).toBe("baxbot doctor --fix");
   });
 
   it("returns command unchanged when profile is default", () => {
     expect(formatCliCommand("cullmate doctor --fix", { CULLMATE_PROFILE: "default" })).toBe(
-      "cullmate doctor --fix",
+      "baxbot doctor --fix",
     );
   });
 
   it("returns command unchanged when profile is Default (case-insensitive)", () => {
     expect(formatCliCommand("cullmate doctor --fix", { CULLMATE_PROFILE: "Default" })).toBe(
-      "cullmate doctor --fix",
+      "baxbot doctor --fix",
     );
   });
 
   it("returns command unchanged when profile is invalid", () => {
     expect(formatCliCommand("cullmate doctor --fix", { CULLMATE_PROFILE: "bad profile" })).toBe(
-      "cullmate doctor --fix",
+      "baxbot doctor --fix",
     );
   });
 
   it("returns command unchanged when --profile is already present", () => {
     expect(
       formatCliCommand("cullmate --profile work doctor --fix", { CULLMATE_PROFILE: "work" }),
-    ).toBe("cullmate --profile work doctor --fix");
+    ).toBe("baxbot --profile work doctor --fix");
   });
 
   it("returns command unchanged when --dev is already present", () => {
     expect(formatCliCommand("cullmate --dev doctor", { CULLMATE_PROFILE: "dev" })).toBe(
-      "cullmate --dev doctor",
+      "baxbot --dev doctor",
     );
   });
 
   it("inserts --profile flag when profile is set", () => {
     expect(formatCliCommand("cullmate doctor --fix", { CULLMATE_PROFILE: "work" })).toBe(
-      "cullmate --profile work doctor --fix",
+      "baxbot --profile work doctor --fix",
     );
   });
 
   it("trims whitespace from profile", () => {
     expect(formatCliCommand("cullmate doctor --fix", { CULLMATE_PROFILE: "  jbcullmate  " })).toBe(
-      "cullmate --profile jbcullmate doctor --fix",
+      "baxbot --profile jbcullmate doctor --fix",
     );
   });
 
   it("handles command with no args after cullmate", () => {
     expect(formatCliCommand("cullmate", { CULLMATE_PROFILE: "test" })).toBe(
-      "cullmate --profile test",
+      "baxbot --profile test",
     );
   });
 
   it("handles pnpm wrapper", () => {
     expect(formatCliCommand("pnpm cullmate doctor", { CULLMATE_PROFILE: "work" })).toBe(
-      "pnpm cullmate --profile work doctor",
+      "pnpm baxbot --profile work doctor",
     );
   });
 });

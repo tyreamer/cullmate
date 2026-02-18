@@ -1,6 +1,6 @@
 import type { IconName } from "./icons.js";
 
-/** Primary nav: shown in the minimal Cullmate shell. */
+/** Primary nav: shown in the minimal BaxBot shell. */
 export const PRIMARY_TABS = [
   { label: "Home", tab: "home" },
   { label: "Projects", tab: "projects" },

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { POSIX_OPENCLAW_TMP_DIR, resolvePreferredOpenClawTmpDir } from "./tmp-openclaw-dir.js";
 
 function fallbackTmp(uid = 501) {
-  return path.join("/var/fallback", `cullmate-${uid}`);
+  return path.join("/var/fallback", `baxbot-${uid}`);
 }
 
 function resolveWithMocks(params: {

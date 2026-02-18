@@ -54,6 +54,14 @@ const IngestVerifySchema = Type.Object({
       description: "User-provided token values for template expansion (e.g. CLIENT, JOB).",
     }),
   ),
+  xmp_patch: Type.Optional(
+    Type.Object({
+      creator: Type.Optional(Type.String()),
+      rights: Type.Optional(Type.String()),
+      webStatement: Type.Optional(Type.String()),
+      credit: Type.Optional(Type.String()),
+    }),
+  ),
 });
 
 export function createIngestVerifyTool(): AnyAgentTool {
@@ -93,6 +101,15 @@ export function createIngestVerifyTool(): AnyAgentTool {
         args.template_context && typeof args.template_context === "object"
           ? (args.template_context as Record<string, string>)
           : undefined;
+      const xmpPatch =
+        args.xmp_patch && typeof args.xmp_patch === "object"
+          ? (args.xmp_patch as {
+              creator?: string;
+              rights?: string;
+              webStatement?: string;
+              credit?: string;
+            })
+          : undefined;
 
       const progressCallback: OnProgress | undefined = onUpdate
         ? (event: IngestProgressEvent) => {
@@ -112,6 +129,7 @@ export function createIngestVerifyTool(): AnyAgentTool {
           backup_dest: backupDest,
           folder_template: folderTemplate,
           template_context: templateContext,
+          xmp_patch: xmpPatch,
         },
         progressCallback,
       );
