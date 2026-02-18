@@ -59,6 +59,13 @@ export const COPY = {
   namingPlaceholder: "e.g. Josh & Kelly \u2014 Swan Point",
   savePhotosButton: "Save photos",
 
+  // Triage results
+  triageUnreadable: (n: number) => `${n} file${n === 1 ? "" : "s"} may be damaged`,
+  triageBlackFrames: (n: number) => `${n} possible junk frame${n === 1 ? "" : "s"}`,
+  triageShowUnreadable: "Show unreadable files",
+  triageShowJunk: "Show junk candidates",
+  triageClean: "All files look good",
+
   // Affordances
   showDetails: "Show details",
   hideDetails: "Hide details",

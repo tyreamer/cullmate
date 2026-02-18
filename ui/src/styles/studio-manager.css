@@ -248,6 +248,33 @@
   letter-spacing: -0.02em;
 }
 
+/* ── Triage summary ── */
+
+.studio-card__triage {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.studio-card__triage--ok {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.studio-card__triage-warn {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.studio-card__triage-info {
+  color: var(--muted);
+}
+
 /* ── Gear button ── */
 
 .studio-gear-btn {

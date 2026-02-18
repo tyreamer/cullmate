@@ -121,6 +121,44 @@ function renderStatusCard(card: StatusCard) {
   `;
 }
 
+function renderTriageSummary(card: ResultCard) {
+  if (!card.triageSummary) {
+    return nothing;
+  }
+  const { unreadableCount, blackFrameCount } = card.triageSummary;
+
+  if (unreadableCount === 0 && blackFrameCount === 0) {
+    return html`
+      <div class="studio-card__triage studio-card__triage--ok">
+        \u2713 ${COPY.triageClean}
+      </div>
+    `;
+  }
+
+  return html`
+    <div class="studio-card__triage">
+      ${
+        unreadableCount > 0
+          ? html`
+        <div class="studio-card__triage-warn">
+          \u26A0 ${COPY.triageUnreadable(unreadableCount)}
+        </div>
+      `
+          : nothing
+      }
+      ${
+        blackFrameCount > 0
+          ? html`
+        <div class="studio-card__triage-info">
+          ${COPY.triageBlackFrames(blackFrameCount)}
+        </div>
+      `
+          : nothing
+      }
+    </div>
+  `;
+}
+
 function renderResultCard(card: ResultCard, state: StudioManagerViewState) {
   const variant = card.safeToFormat === true ? "safe" : "unsafe";
 
@@ -157,6 +195,7 @@ function renderResultCard(card: ResultCard, state: StudioManagerViewState) {
         `
           : nothing
       }
+      ${renderTriageSummary(card)}
       <div class="studio-card__actions">
         ${card.buttons.map(
           (btn) => html`

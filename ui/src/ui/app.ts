@@ -1235,6 +1235,11 @@ export class OpenClawApp extends LitElement {
         // Lightroom import — reveal project folder for now
         void this.handleIngestRevealProject();
         break;
+      case "studio-show-unreadable":
+      case "studio-show-junk":
+        // Open the Safety Report (triage details are inside)
+        void this.handleIngestOpenReport();
+        break;
       default:
         if (action.startsWith("select-layout:")) {
           const templateId = action.slice("select-layout:".length);
@@ -1335,6 +1340,10 @@ export class OpenClawApp extends LitElement {
 
       // Show result card in timeline
       const safeToFormat = result.safe_to_format ?? null;
+      const triageDetail =
+        !safeToFormat && result.triage?.unreadable_count
+          ? `${result.triage.unreadable_count} file${result.triage.unreadable_count === 1 ? "" : "s"} could not be read and may be damaged. Check the Safety Report before formatting your cards.`
+          : undefined;
       this.studioTimeline = [
         {
           kind: "text" as const,
@@ -1348,10 +1357,17 @@ export class OpenClawApp extends LitElement {
           role: "cullmate" as const,
           safeToFormat,
           headline: safeToFormat ? COPY.safeToFormatYes : COPY.safeToFormatNotYet,
-          detail: safeToFormat ? COPY.safeToFormatYesDetail : COPY.safeToFormatNoDetail,
+          detail:
+            triageDetail ?? (safeToFormat ? COPY.safeToFormatYesDetail : COPY.safeToFormatNoDetail),
           buttons: [
             { label: COPY.openSafetyReport, action: "studio-open-report" },
             { label: COPY.openInFinder, action: "studio-reveal-project" },
+            ...(result.triage?.unreadable_count
+              ? [{ label: COPY.triageShowUnreadable, action: "studio-show-unreadable" }]
+              : []),
+            ...(result.triage?.black_frame_count
+              ? [{ label: COPY.triageShowJunk, action: "studio-show-junk" }]
+              : []),
           ],
           counters: result.totals
             ? [
@@ -1364,6 +1380,12 @@ export class OpenClawApp extends LitElement {
                   : []),
               ]
             : [],
+          triageSummary: result.triage
+            ? {
+                unreadableCount: result.triage.unreadable_count,
+                blackFrameCount: result.triage.black_frame_count,
+              }
+            : undefined,
         },
       ];
     } catch (err) {
@@ -1473,6 +1495,10 @@ export class OpenClawApp extends LitElement {
 
       // Show project card with shoot name as headline
       const safeToFormat = result.safe_to_format ?? null;
+      const triageDetail2 =
+        !safeToFormat && result.triage?.unreadable_count
+          ? `${result.triage.unreadable_count} file${result.triage.unreadable_count === 1 ? "" : "s"} could not be read and may be damaged. Check the Safety Report before formatting your cards.`
+          : undefined;
       this.studioTimeline = [
         {
           kind: "text" as const,
@@ -1487,11 +1513,19 @@ export class OpenClawApp extends LitElement {
           safeToFormat,
           headline: trimmedName,
           verdict: safeToFormat ? COPY.safeToFormatYes : COPY.safeToFormatNotYet,
-          detail: safeToFormat ? COPY.safeToFormatYesDetail : COPY.safeToFormatNoDetail,
+          detail:
+            triageDetail2 ??
+            (safeToFormat ? COPY.safeToFormatYesDetail : COPY.safeToFormatNoDetail),
           buttons: [
             { label: COPY.openFolder, action: "studio-reveal-project" },
             { label: COPY.openSafetyReport, action: "studio-open-report" },
             { label: COPY.importToLightroom, action: "studio-import-lightroom" },
+            ...(result.triage?.unreadable_count
+              ? [{ label: COPY.triageShowUnreadable, action: "studio-show-unreadable" }]
+              : []),
+            ...(result.triage?.black_frame_count
+              ? [{ label: COPY.triageShowJunk, action: "studio-show-junk" }]
+              : []),
           ],
           counters: result.totals
             ? [
@@ -1504,6 +1538,12 @@ export class OpenClawApp extends LitElement {
                   : []),
               ]
             : [],
+          triageSummary: result.triage
+            ? {
+                unreadableCount: result.triage.unreadable_count,
+                blackFrameCount: result.triage.black_frame_count,
+              }
+            : undefined,
         },
       ];
     } catch (err) {

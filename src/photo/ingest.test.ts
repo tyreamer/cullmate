@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { FolderTemplate } from "./folder-template.js";
 import type { IngestManifest, IngestProgressEvent } from "./types.js";
@@ -12,6 +13,31 @@ describe("ingest integration", () => {
   let sourceDir: string;
   let destDir: string;
 
+  // Helper to create minimal valid images
+  async function makeJpeg(color = { r: 128, g: 128, b: 128 }): Promise<Buffer> {
+    return sharp({ create: { width: 4, height: 4, channels: 3, background: color } })
+      .jpeg()
+      .toBuffer();
+  }
+
+  async function makePng(color = { r: 128, g: 128, b: 128 }): Promise<Buffer> {
+    return sharp({ create: { width: 4, height: 4, channels: 3, background: color } })
+      .png()
+      .toBuffer();
+  }
+
+  // Minimal ftyp box that file-type recognizes as video/quicktime
+  function makeMinimalMov(): Buffer {
+    const ftyp = Buffer.alloc(32);
+    ftyp.writeUInt32BE(32, 0);
+    ftyp.write("ftyp", 4);
+    ftyp.write("qt  ", 8);
+    return ftyp;
+  }
+
+  // Store the JPEG buffer for hash verification in tests
+  let jpegBuf1: Buffer;
+
   beforeAll(async () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "baxbot-ingest-test-"));
     sourceDir = path.join(tmpDir, "source");
@@ -21,11 +47,19 @@ describe("ingest integration", () => {
     await fs.mkdir(path.join(sourceDir, "day1"), { recursive: true });
     await fs.mkdir(path.join(sourceDir, "day2"), { recursive: true });
 
-    await fs.writeFile(path.join(sourceDir, "day1", "IMG_001.jpg"), "fake-jpg-data-1");
-    await fs.writeFile(path.join(sourceDir, "day1", "MOV_003.mov"), "fake-video-data");
-    await fs.writeFile(path.join(sourceDir, "day2", "DSC_002.nef"), "fake-raw-data-2");
-    await fs.writeFile(path.join(sourceDir, "day2", "IMG_004.cr2"), "fake-cr2-data");
-    await fs.writeFile(path.join(sourceDir, "day2", "IMG_005.png"), "fake-png-data");
+    jpegBuf1 = await makeJpeg({ r: 100, g: 50, b: 200 });
+    await fs.writeFile(path.join(sourceDir, "day1", "IMG_001.jpg"), jpegBuf1);
+    await fs.writeFile(path.join(sourceDir, "day1", "MOV_003.mov"), makeMinimalMov());
+    // RAW files: use JPEG data since Sharp can decode them from the magic bytes
+    await fs.writeFile(
+      path.join(sourceDir, "day2", "DSC_002.nef"),
+      await makeJpeg({ r: 50, g: 100, b: 150 }),
+    );
+    await fs.writeFile(
+      path.join(sourceDir, "day2", "IMG_004.cr2"),
+      await makeJpeg({ r: 200, g: 100, b: 50 }),
+    );
+    await fs.writeFile(path.join(sourceDir, "day2", "IMG_005.png"), await makePng());
 
     // Also create a non-media file that should be ignored
     await fs.writeFile(path.join(sourceDir, "day1", "notes.txt"), "text file");
@@ -60,14 +94,11 @@ describe("ingest integration", () => {
     await expect(fs.stat(path.join(projectRoot, ".cullmate"))).resolves.toBeTruthy();
 
     // Files copied to correct locations
-    const img001 = await fs.readFile(
-      path.join(projectRoot, "01_RAW", "day1", "IMG_001.jpg"),
-      "utf-8",
-    );
-    expect(img001).toBe("fake-jpg-data-1");
+    const img001 = await fs.readFile(path.join(projectRoot, "01_RAW", "day1", "IMG_001.jpg"));
+    expect(Buffer.compare(img001, jpegBuf1)).toBe(0);
 
-    const nef = await fs.readFile(path.join(projectRoot, "01_RAW", "day2", "DSC_002.nef"), "utf-8");
-    expect(nef).toBe("fake-raw-data-2");
+    const nef = await fs.stat(path.join(projectRoot, "01_RAW", "day2", "DSC_002.nef"));
+    expect(nef.size).toBeGreaterThan(0);
 
     // Non-media file was not copied
     await expect(fs.stat(path.join(projectRoot, "01_RAW", "day1", "notes.txt"))).rejects.toThrow();
@@ -89,7 +120,7 @@ describe("ingest integration", () => {
     }
 
     // Verify hash correctness for one file
-    const img001Hash = crypto.createHash("sha256").update("fake-jpg-data-1").digest("hex");
+    const img001Hash = crypto.createHash("sha256").update(jpegBuf1).digest("hex");
     const img001Entry = manifest.files.find((f) => f.src_rel === "day1/IMG_001.jpg");
     expect(img001Entry?.hash).toBe(img001Hash);
 
@@ -219,10 +250,13 @@ describe("ingest integration", () => {
     await fs.mkdir(path.join(dedupeSource, "card1"), { recursive: true });
     await fs.mkdir(path.join(dedupeSource, "card2"), { recursive: true });
 
-    const identicalContent = "identical-photo-data-for-dedupe";
+    const identicalContent = await makeJpeg({ r: 77, g: 77, b: 77 });
     await fs.writeFile(path.join(dedupeSource, "card1", "IMG_001.jpg"), identicalContent);
     await fs.writeFile(path.join(dedupeSource, "card2", "IMG_001.jpg"), identicalContent);
-    await fs.writeFile(path.join(dedupeSource, "card1", "IMG_002.cr2"), "unique-raw-data");
+    await fs.writeFile(
+      path.join(dedupeSource, "card1", "IMG_002.cr2"),
+      await makeJpeg({ r: 88, g: 88, b: 88 }),
+    );
 
     const freshDest = path.join(tmpDir, "output-dedupe");
     const events: IngestProgressEvent[] = [];
@@ -246,7 +280,7 @@ describe("ingest integration", () => {
     expect(manifest.totals.file_count).toBe(3);
     expect(manifest.totals.success_count).toBe(2);
     expect(manifest.totals.duplicate_count).toBe(1);
-    expect(manifest.totals.bytes_saved).toBe(Buffer.byteLength(identicalContent));
+    expect(manifest.totals.bytes_saved).toBe(identicalContent.length);
 
     // One file has status skipped_duplicate with valid duplicate_of
     const dupeEntries = manifest.files.filter((f) => f.status === "skipped_duplicate");
@@ -260,7 +294,10 @@ describe("ingest integration", () => {
     expect(copiedEntry!.status).toBe("copied");
 
     // Both identical files have the same hash
-    const identicalHash = crypto.createHash("sha256").update(identicalContent).digest("hex");
+    const identicalHash = crypto
+      .createHash("sha256")
+      .update(Buffer.from(identicalContent))
+      .digest("hex");
     const bothImg001 = manifest.files.filter((f) => f.src_rel.endsWith("IMG_001.jpg"));
     expect(bothImg001).toHaveLength(2);
     for (const f of bothImg001) {
@@ -272,7 +309,7 @@ describe("ingest integration", () => {
     expect(dedupeEvents).toHaveLength(1);
     const dedupeHit = dedupeEvents[0];
     expect(dedupeHit.duplicate_count_total).toBe(1);
-    expect(dedupeHit.bytes_saved_total).toBe(Buffer.byteLength(identicalContent));
+    expect(dedupeHit.bytes_saved_total).toBe(identicalContent.length);
 
     // Skipped file NOT written to disk, copied file IS on disk
     const copiedDstAbs = path.join(projectRoot, copiedEntry!.dst_rel);
@@ -294,10 +331,13 @@ describe("ingest integration", () => {
     await fs.mkdir(path.join(dedupeSource, "card1"), { recursive: true });
     await fs.mkdir(path.join(dedupeSource, "card2"), { recursive: true });
 
-    const identicalContent = "identical-photo-data-for-nodedupe";
+    const identicalContent = await makeJpeg({ r: 99, g: 99, b: 99 });
     await fs.writeFile(path.join(dedupeSource, "card1", "IMG_001.jpg"), identicalContent);
     await fs.writeFile(path.join(dedupeSource, "card2", "IMG_001.jpg"), identicalContent);
-    await fs.writeFile(path.join(dedupeSource, "card1", "IMG_002.cr2"), "unique-raw-data-nd");
+    await fs.writeFile(
+      path.join(dedupeSource, "card1", "IMG_002.cr2"),
+      await makeJpeg({ r: 111, g: 111, b: 111 }),
+    );
 
     const freshDest = path.join(tmpDir, "output-nodedupe");
 
@@ -328,10 +368,13 @@ describe("ingest integration", () => {
     await fs.mkdir(path.join(dedupeSource, "card1"), { recursive: true });
     await fs.mkdir(path.join(dedupeSource, "card2"), { recursive: true });
 
-    const identicalContent = "identical-photo-data-for-default";
+    const identicalContent = await makeJpeg({ r: 120, g: 120, b: 120 });
     await fs.writeFile(path.join(dedupeSource, "card1", "IMG_001.jpg"), identicalContent);
     await fs.writeFile(path.join(dedupeSource, "card2", "IMG_001.jpg"), identicalContent);
-    await fs.writeFile(path.join(dedupeSource, "card1", "IMG_002.cr2"), "unique-raw-data-df");
+    await fs.writeFile(
+      path.join(dedupeSource, "card1", "IMG_002.cr2"),
+      await makeJpeg({ r: 130, g: 130, b: 130 }),
+    );
 
     const freshDest = path.join(tmpDir, "output-default-dedupe");
 
@@ -411,9 +454,8 @@ describe("ingest integration", () => {
     // Backup files actually exist on disk
     const backupImg = await fs.readFile(
       path.join(backupDest, "BackupTest", "01_RAW", "day1", "IMG_001.jpg"),
-      "utf-8",
     );
-    expect(backupImg).toBe("fake-jpg-data-1");
+    expect(Buffer.compare(backupImg, jpegBuf1)).toBe(0);
 
     // Backup project structure created
     await expect(fs.stat(path.join(backupDest, "BackupTest", "02_EXPORTS"))).resolves.toBeTruthy();

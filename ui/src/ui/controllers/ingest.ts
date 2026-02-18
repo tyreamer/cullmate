@@ -18,6 +18,9 @@ export type IngestProgress = {
   report_path?: string;
   total_bytes_copied?: number;
   bytes_copied?: number;
+  analyzed_count?: number;
+  analyzed_total?: number;
+  flagged_count?: number;
 };
 
 export type RecentProject = {
@@ -60,6 +63,10 @@ export type IngestResult = {
   manifest_path?: string;
   report_path?: string;
   safe_to_format?: boolean;
+  triage?: {
+    unreadable_count: number;
+    black_frame_count: number;
+  };
   totals?: {
     file_count: number;
     success_count: number;

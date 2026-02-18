@@ -1,4 +1,5 @@
 import type { FolderTemplate, MediaType } from "./folder-template.js";
+import type { TriageFlag, TriageResult } from "./triage-types.js";
 import type { XmpPatch } from "./xmp/xmp-sidecar.js";
 
 export type VerifyMode = "none" | "sentinel" | "full";
@@ -41,6 +42,8 @@ export type FileEntry = {
   backup_hash_dest?: string; // hex digest from backup verification pass
   backup_verified?: boolean;
   backup_error?: string;
+  // Triage flags (populated by triage pass)
+  triage_flags?: TriageFlag[];
 };
 
 export type IngestManifest = {
@@ -60,6 +63,7 @@ export type IngestManifest = {
   backup_root?: string; // backup 01_RAW/ absolute path
   template_id?: string;
   safe_to_format: boolean;
+  triage?: TriageResult;
   totals: {
     file_count: number;
     success_count: number;
@@ -78,6 +82,8 @@ export type IngestManifest = {
     backup_verified_mismatch: number;
     xmp_written_count: number;
     xmp_failed_count: number;
+    triage_unreadable_count: number;
+    triage_black_frame_count: number;
   };
   files: FileEntry[];
 };
@@ -127,6 +133,18 @@ export type IngestProgressEvent =
       written_count: number;
       failed_count: number;
       total: number;
+    }
+  | {
+      type: "ingest.triage.progress";
+      analyzed_count: number;
+      analyzed_total: number;
+      flagged_count: number;
+    }
+  | {
+      type: "ingest.triage.done";
+      unreadable_count: number;
+      black_frame_count: number;
+      elapsed_ms: number;
     }
   | {
       type: "ingest.report.generated";

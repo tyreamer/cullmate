@@ -12,6 +12,8 @@ import { writeManifest, writeProofReport } from "./report.js";
 import { scanSourceFiles } from "./scan.js";
 import { buildTokenContext } from "./template-context.js";
 import { expandTemplate } from "./template-expand.js";
+import { writeTriageCsv, writeTriageJson } from "./triage-report.js";
+import { runTriage } from "./triage.js";
 import { verifyFiles } from "./verify.js";
 import { writeXmpSidecar } from "./xmp/xmp-sidecar.js";
 
@@ -468,7 +470,7 @@ export async function runIngest(
   // 4. Zero primary verification mismatches
   // 5. Zero backup verification mismatches
   // 6. All files that were copied to primary were also copied to backup
-  const safeToFormat =
+  let safeToFormat =
     hasBackup &&
     failCount === 0 &&
     backupFailCount === 0 &&
@@ -476,6 +478,14 @@ export async function runIngest(
     backupVerifiedMismatch === 0 &&
     successCount + skipCount ===
       backupSuccessCount + files.filter((f) => f.backup_status === "skipped_exists").length;
+
+  // ── Phase 5: Triage pass ──
+  const triageResult = await runTriage({ files, projectRoot }, onProgress);
+
+  // If unreadable files found, override safe_to_format
+  if (triageResult.unreadable_count > 0) {
+    safeToFormat = false;
+  }
 
   const manifest: IngestManifest = {
     tool_version: 1,
@@ -492,6 +502,7 @@ export async function runIngest(
     backup_root: backupDestRoot ?? undefined,
     template_id: template?.template_id,
     safe_to_format: safeToFormat,
+    triage: triageResult,
     totals: {
       file_count: files.length,
       success_count: successCount,
@@ -510,6 +521,8 @@ export async function runIngest(
       backup_verified_mismatch: backupVerifiedMismatch,
       xmp_written_count: files.filter((f) => f.sidecar_written === true).length,
       xmp_failed_count: files.filter((f) => f.sidecar_written === false).length,
+      triage_unreadable_count: triageResult.unreadable_count,
+      triage_black_frame_count: triageResult.black_frame_count,
     },
     files,
   };
@@ -520,6 +533,10 @@ export async function runIngest(
 
   const reportPath = await writeProofReport(cullmateDir, manifest);
   manifest.report_path = reportPath;
+
+  // Write triage artifacts
+  await writeTriageJson(cullmateDir, triageResult);
+  await writeTriageCsv(cullmateDir, triageResult);
 
   // Re-write manifest now that it includes paths
   await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), {

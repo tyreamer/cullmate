@@ -92,6 +92,9 @@ function renderSafeToFormatBanner(manifest: IngestManifest): string {
   if (t.backup_verified_mismatch > 0) {
     reasons.push(`${t.backup_verified_mismatch} backup verification mismatch(es)`);
   }
+  if (t.triage_unreadable_count > 0) {
+    reasons.push(`${t.triage_unreadable_count} unreadable file(s) — possible corruption`);
+  }
 
   return `
 <div class="safe-banner safe-banner--no">
@@ -118,6 +121,12 @@ export async function writeProofReport(
   const duplicates = manifest.files.filter((f) => f.status === "skipped_duplicate");
   const backupFailures = manifest.files.filter((f) => f.backup_status === "error");
   const backupMismatches = manifest.files.filter((f) => f.backup_verified === false);
+  const triageUnreadable = manifest.files.filter((f) =>
+    f.triage_flags?.some((fl) => fl.kind === "unreadable"),
+  );
+  const triageBlackFrames = manifest.files.filter((f) =>
+    f.triage_flags?.some((fl) => fl.kind === "black_frame"),
+  );
   const elapsedStr = elapsed(manifest.started_at, manifest.finished_at);
 
   let verifyExplanation = "";
@@ -202,6 +211,7 @@ ${t.xmp_written_count > 0 ? `    <dt>Photo info added:</dt><dd>${t.xmp_written_c
     <dt>Photo info skipped:</dt><dd>${t.xmp_failed_count} photos</dd>`
       : ""
   }
+${t.triage_unreadable_count > 0 || t.triage_black_frame_count > 0 ? `    <dt>Triage:</dt><dd>${t.triage_unreadable_count} unreadable, ${t.triage_black_frame_count} possible junk frames</dd>` : ""}
     <dt>Hash algorithm:</dt><dd>${escapeHtml(manifest.hash_algo)}</dd>
     <dt>Verify mode:</dt><dd>${escapeHtml(manifest.verify_mode)}</dd>
     <dt>Elapsed:</dt><dd>${elapsedStr}</dd>
@@ -215,6 +225,44 @@ ${t.xmp_written_count > 0 ? `    <dt>Photo info added:</dt><dd>${t.xmp_written_c
   ${t.verified_count > 0 ? `<br>Primary: ${t.verified_ok}/${t.verified_count} OK${t.verified_mismatch > 0 ? `, <strong style="color:#c62828">${t.verified_mismatch} MISMATCH</strong>` : ""}` : ""}
   ${t.backup_verified_count > 0 ? `<br>Backup: ${t.backup_verified_ok}/${t.backup_verified_count} OK${t.backup_verified_mismatch > 0 ? `, <strong style="color:#c62828">${t.backup_verified_mismatch} MISMATCH</strong>` : ""}` : ""}
 </div>
+
+${
+  triageUnreadable.length > 0
+    ? `<div class="safe-banner safe-banner--no">
+  <div class="safe-banner__icon">&#x26A0;</div>
+  <div>
+    <div class="safe-banner__title">${triageUnreadable.length} Unreadable File${triageUnreadable.length === 1 ? "" : "s"} Detected</div>
+    <div class="safe-banner__sub">These files could not be decoded and may be corrupt. Do NOT format your cards until you verify them manually.</div>
+  </div>
+</div>
+
+<h2>Unreadable Files (${triageUnreadable.length})</h2>
+<table>
+<tr><th>File</th><th>Reason</th><th>Confidence</th></tr>
+${triageUnreadable
+  .map((f) => {
+    const flag = f.triage_flags!.find((fl) => fl.kind === "unreadable")!;
+    return `<tr class="error"><td class="mono">${escapeHtml(f.src_rel)}</td><td>${escapeHtml(flag.reason)}</td><td>${Math.round(flag.confidence * 100)}%</td></tr>`;
+  })
+  .join("\n")}
+</table>`
+    : ""
+}
+
+${
+  triageBlackFrames.length > 0
+    ? `<h2>Possible Junk Frames (${triageBlackFrames.length})</h2>
+<table>
+<tr><th>File</th><th>Reason</th><th>Brightness</th></tr>
+${triageBlackFrames
+  .map((f) => {
+    const flag = f.triage_flags!.find((fl) => fl.kind === "black_frame")!;
+    return `<tr><td class="mono">${escapeHtml(f.src_rel)}</td><td>${escapeHtml(flag.reason)}</td><td>${flag.metric ?? "-"}/255</td></tr>`;
+  })
+  .join("\n")}
+</table>`
+    : ""
+}
 
 ${
   failures.length > 0

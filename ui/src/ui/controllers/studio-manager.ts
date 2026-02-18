@@ -46,6 +46,10 @@ export type ResultCard = {
   detail: string;
   buttons: Array<{ label: string; action: string }>;
   counters?: Array<{ label: string; value: string }>;
+  triageSummary?: {
+    unreadableCount: number;
+    blackFrameCount: number;
+  };
 };
 
 export type FormCard = {
