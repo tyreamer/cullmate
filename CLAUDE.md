@@ -220,8 +220,9 @@ The UI is a photographer-first app centered on a conversation-driven "Studio Man
 - Terminal output: use `src/terminal/table.ts` for tables, `src/terminal/palette.ts` for colors.
 - Tool schemas: avoid `Type.Union` / `anyOf` / `oneOf` / `allOf`; use `stringEnum`/`optionalStringEnum` for string lists.
 - Product name: **BaxBot** (PascalCase) in docs/headings; `baxbot` (lowercase) for CLI/package/config.
+- User-facing terminal/UI copy should prefer **BaxBot/Cullmate** wording over OpenClaw (except where compatibility explicitly requires the upstream name).
 - Internal TS types still use `OpenClaw` prefix (e.g. `OpenClawConfig`) — TODO(rename) for future cleanup.
-- Remaining `CULLMATE_*` env vars and `.cullmate/` directory names are intentional backward compatibility — do not rename these.
+- Remaining `OPENCLAW_*` and `CULLMATE_*` env vars plus `.cullmate/` directory names are intentional backward compatibility — do not rename these.
 
 ## Plugin/Extension Rules
 
