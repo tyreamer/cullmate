@@ -50,6 +50,12 @@ export type ResultCard = {
     unreadableCount: number;
     blackFrameCount: number;
   };
+  burstSummary?: {
+    burstCount: number;
+    bestPickCount: number;
+  };
+  reviewFolder?: string;
+  badges?: Array<{ label: string; variant: "safe" | "unsafe" | "neutral"; action?: string }>;
 };
 
 export type FormCard = {
@@ -64,7 +70,46 @@ export type FormCard = {
   submitButton: { label: string; action: string };
 };
 
-export type TimelineEntry = TextMessage | ActionCard | StatusCard | ResultCard | FormCard;
+export type TemplatePickerCard = {
+  kind: "template-picker";
+  id: string;
+  role: "cullmate";
+  presets: FolderTemplate[];
+};
+
+export type ImportCard = {
+  kind: "import";
+  id: string;
+  role: "cullmate";
+  source: { label: string; path: string } | null;
+  projectName: string;
+  saveTo: string;
+  saveToLabel: string;
+  optionsExpanded: boolean;
+  verifyMode: "none" | "sentinel" | "full";
+  dedupeEnabled: boolean;
+  folderTemplateName: string;
+};
+
+export type StageProgressCard = {
+  kind: "stage-progress";
+  id: string;
+  role: "cullmate";
+  projectName: string;
+  stages: Array<{ id: string; label: string; status: "pending" | "active" | "done" }>;
+  currentStageProgress: number;
+  statusLine: string;
+};
+
+export type TimelineEntry =
+  | TextMessage
+  | ActionCard
+  | StatusCard
+  | ResultCard
+  | FormCard
+  | TemplatePickerCard
+  | ImportCard
+  | StageProgressCard;
 
 // ── Builder ──
 
@@ -81,6 +126,7 @@ export function buildStarterTimeline(opts: {
   hasStorageConfig: boolean;
   hasFolderTemplate: boolean;
   hasCompletedProfileSetup: boolean;
+  hasAiOnboardingDone: boolean;
   presets?: FolderTemplate[];
 }): TimelineEntry[] {
   const {
@@ -89,6 +135,7 @@ export function buildStarterTimeline(opts: {
     hasStorageConfig,
     hasFolderTemplate,
     hasCompletedProfileSetup,
+    hasAiOnboardingDone,
     presets,
   } = opts;
 
@@ -113,10 +160,6 @@ export function buildStarterTimeline(opts: {
 
   // ── State: template_missing ──
   if (!hasFolderTemplate) {
-    const layoutChips = (presets ?? []).map((p) => ({
-      label: p.name,
-      action: `select-layout:${p.template_id}`,
-    }));
     return [
       {
         kind: "text",
@@ -125,15 +168,16 @@ export function buildStarterTimeline(opts: {
         body: COPY.storageDone,
       },
       {
-        kind: "action",
+        kind: "text",
+        id: "layout-prompt",
+        role: "cullmate",
+        body: COPY.layoutPrompt,
+      },
+      {
+        kind: "template-picker",
         id: "setup-layout",
         role: "cullmate",
-        title: COPY.layoutPrompt,
-        chips: layoutChips.length > 0 ? layoutChips : undefined,
-        primaryButton: {
-          label: COPY.layoutClassicButton,
-          action: "select-layout:preset:classic",
-        },
+        presets: presets ?? [],
       },
     ];
   }
@@ -152,8 +196,30 @@ export function buildStarterTimeline(opts: {
         id: "setup-profile",
         role: "cullmate",
         title: COPY.profileTitleInline,
+        description: COPY.profileDescription,
         primaryButton: { label: COPY.profileTurnOn, action: "open-profile-setup" },
         secondaryButtons: [{ label: COPY.profileNotNow, action: "skip-profile-setup" }],
+      },
+    ];
+  }
+
+  // ── State: ai_optional (optional AI setup question) ──
+  if (!hasAiOnboardingDone) {
+    return [
+      {
+        kind: "text",
+        id: "ai-prompt",
+        role: "cullmate",
+        body: COPY.aiPromptInline,
+      },
+      {
+        kind: "action",
+        id: "setup-ai",
+        role: "cullmate",
+        title: COPY.aiTitleInline,
+        description: COPY.aiDescription,
+        primaryButton: { label: COPY.aiSetupNow, action: "open-ai-setup" },
+        secondaryButtons: [{ label: COPY.aiNotNow, action: "skip-ai-setup" }],
       },
     ];
   }
@@ -265,4 +331,67 @@ export function buildNamingTimeline(opts: {
       submitButton: { label: COPY.savePhotosButton, action: "start-named-ingest" },
     },
   ];
+}
+
+/**
+ * Build the import card timeline entries (replaces naming form in the new flow).
+ */
+export function buildImportTimeline(opts: {
+  source: { label: string; path: string } | null;
+  projectName: string;
+  saveTo: string;
+  saveToLabel: string;
+  verifyMode: "none" | "sentinel" | "full";
+  dedupeEnabled: boolean;
+  folderTemplateName: string;
+}): TimelineEntry[] {
+  const entries: TimelineEntry[] = [];
+  if (opts.source) {
+    entries.push({
+      kind: "text",
+      id: "import-intro",
+      role: "cullmate",
+      body: COPY.detectedSourceBody(opts.source.label),
+    });
+  }
+  entries.push({
+    kind: "import",
+    id: "import-card",
+    role: "cullmate",
+    source: opts.source,
+    projectName: opts.projectName,
+    saveTo: opts.saveTo,
+    saveToLabel: opts.saveToLabel,
+    optionsExpanded: false,
+    verifyMode: opts.verifyMode,
+    dedupeEnabled: opts.dedupeEnabled,
+    folderTemplateName: opts.folderTemplateName,
+  });
+  return entries;
+}
+
+/**
+ * Build a folder tree preview string from a FolderTemplate.
+ */
+export function buildTemplateTree(template: FolderTemplate): string {
+  const lines: string[] = [];
+  lines.push("ProjectName/");
+  const dirs: string[] = [];
+  for (const rule of template.routing_rules) {
+    // Extract the top-level folder from dest_pattern
+    const topDir = rule.dest_pattern.split("/")[0];
+    if (topDir && !dirs.includes(topDir)) {
+      dirs.push(topDir);
+    }
+  }
+  for (const dir of template.scaffold_dirs) {
+    const topDir = dir.split("/")[0];
+    if (!dirs.includes(topDir)) {
+      dirs.push(topDir);
+    }
+  }
+  for (const dir of dirs) {
+    lines.push(`  ${dir}/`);
+  }
+  return lines.join("\n");
 }

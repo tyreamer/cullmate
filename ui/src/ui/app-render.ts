@@ -380,6 +380,7 @@ export function renderApp(state: AppViewState) {
                 connected: state.connected,
                 timeline: state.studioTimeline,
                 formValues: state.studioFormValues,
+                importOptionsExpanded: state.importOptionsExpanded,
                 onAction: (action) => state.handleStudioAction(action),
                 onFormValueChange: (fieldId, value) =>
                   state.handleStudioFormValueChange(fieldId, value),
@@ -444,6 +445,7 @@ export function renderApp(state: AppViewState) {
                 storageConfig: state.storageConfig,
                 folderTemplate: state.folderTemplate,
                 studioProfile: state.studioProfile,
+                diagnosticsExporting: state.diagnosticsExporting,
                 onSettingsChange: (next) => state.applySettings(next),
                 onChangeStorage: () => state.handleOpenStorageSetup(),
                 onChangeFolderTemplate: () => state.handleOpenFolderTemplatePicker(),
@@ -451,6 +453,25 @@ export function renderApp(state: AppViewState) {
                 onToggleProfileEnabled: (enabled) => {
                   const updated = { ...state.studioProfile, enabled };
                   state.handleSaveStudioProfile(updated);
+                },
+                onEditorChange: (editor) => {
+                  const updated = { ...state.studioProfile, preferredEditor: editor };
+                  state.handleSaveStudioProfile(updated);
+                },
+                onExportDiagnostics: () => state.handleExportDiagnostics(),
+                onToggleAiFeatures: (enabled) =>
+                  state.applySettings({
+                    ...state.settings,
+                    aiFeaturesEnabled: enabled,
+                    aiOnboardingDone: true,
+                  }),
+                onRunAiSetup: () => {
+                  state.applySettings({
+                    ...state.settings,
+                    aiFeaturesEnabled: true,
+                    aiOnboardingDone: true,
+                  });
+                  void state.checkSmartOrganizerStatus();
                 },
                 onPickFolder: async () => {
                   if (!state.client) {
@@ -1278,6 +1299,7 @@ export function renderApp(state: AppViewState) {
                     storageConfig: state.storageConfig,
                     folderTemplate: state.folderTemplate,
                     studioProfile: state.studioProfile,
+                    diagnosticsExporting: state.diagnosticsExporting,
                     onSettingsChange: (next) => state.applySettings(next),
                     onChangeStorage: () => {
                       state.isSettingsSheetOpen = false;
@@ -1294,6 +1316,25 @@ export function renderApp(state: AppViewState) {
                     onToggleProfileEnabled: (enabled) => {
                       const updated = { ...state.studioProfile, enabled };
                       state.handleSaveStudioProfile(updated);
+                    },
+                    onEditorChange: (editor) => {
+                      const updated = { ...state.studioProfile, preferredEditor: editor };
+                      state.handleSaveStudioProfile(updated);
+                    },
+                    onExportDiagnostics: () => state.handleExportDiagnostics(),
+                    onToggleAiFeatures: (enabled) =>
+                      state.applySettings({
+                        ...state.settings,
+                        aiFeaturesEnabled: enabled,
+                        aiOnboardingDone: true,
+                      }),
+                    onRunAiSetup: () => {
+                      state.applySettings({
+                        ...state.settings,
+                        aiFeaturesEnabled: true,
+                        aiOnboardingDone: true,
+                      });
+                      void state.checkSmartOrganizerStatus();
                     },
                     onPickFolder: async () => {
                       if (!state.client) {

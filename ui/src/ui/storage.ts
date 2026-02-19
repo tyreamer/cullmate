@@ -20,6 +20,8 @@ export type UiSettings = {
   copyrightName: string;
   copyrightStudio: string;
   copyrightWebsite: string;
+  aiFeaturesEnabled: boolean;
+  aiOnboardingDone: boolean;
 };
 
 export function loadSettings(): UiSettings {
@@ -46,6 +48,8 @@ export function loadSettings(): UiSettings {
     copyrightName: "",
     copyrightStudio: "",
     copyrightWebsite: "",
+    aiFeaturesEnabled: false,
+    aiOnboardingDone: false,
   };
 
   try {
@@ -115,6 +119,14 @@ export function loadSettings(): UiSettings {
         typeof parsed.copyrightWebsite === "string"
           ? parsed.copyrightWebsite
           : defaults.copyrightWebsite,
+      aiFeaturesEnabled:
+        typeof parsed.aiFeaturesEnabled === "boolean"
+          ? parsed.aiFeaturesEnabled
+          : defaults.aiFeaturesEnabled,
+      aiOnboardingDone:
+        typeof parsed.aiOnboardingDone === "boolean"
+          ? parsed.aiOnboardingDone
+          : defaults.aiOnboardingDone,
     };
   } catch {
     return defaults;

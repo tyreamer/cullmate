@@ -1,8 +1,9 @@
 import { html } from "lit";
 import type { FolderTemplate } from "../../../../src/photo/folder-template.js";
-import type { StudioProfile } from "../controllers/studio-profile.ts";
+import type { PreferredEditor, StudioProfile } from "../controllers/studio-profile.ts";
 import type { UiSettings } from "../storage.ts";
 import { formatPathLabel, type StorageConfig } from "../controllers/storage.ts";
+import { COPY } from "../copy/studio-manager-copy.ts";
 
 export type SettingsViewState = {
   settings: UiSettings;
@@ -16,6 +17,11 @@ export type SettingsViewState = {
   onChangeFolderTemplate: () => void;
   onEditProfile: () => void;
   onToggleProfileEnabled: (enabled: boolean) => void;
+  onEditorChange: (editor: PreferredEditor) => void;
+  onExportDiagnostics: () => void;
+  diagnosticsExporting: boolean;
+  onToggleAiFeatures: (enabled: boolean) => void;
+  onRunAiSetup: () => void;
 };
 
 export function renderSettingsView(state: SettingsViewState) {
@@ -194,6 +200,64 @@ export function renderSettingsView(state: SettingsViewState) {
             can read it. Your original photos are never changed.
           </p>
         </details>
+      </section>
+
+      <section>
+        <h3 style="font-size: 0.9rem; margin: 0 0 8px;">Preferred Editor</h3>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          ${(
+            [
+              ["open_folder", "Finder"],
+              ["lightroom", "Lightroom"],
+              ["capture_one", "Capture One"],
+              ["photo_mechanic", "Photo Mechanic"],
+            ] as const
+          ).map(
+            ([value, label]) => html`
+              <button
+                class="btn btn--sm ${state.studioProfile.preferredEditor === value ? "primary" : ""}"
+                style="padding: 6px 12px; font-size: 0.78rem;"
+                @click=${() => state.onEditorChange(value)}
+              >${label}</button>
+            `,
+          )}
+        </div>
+        <p style="font-size: 0.72rem; color: var(--muted); margin: 6px 0 0;">
+          Where to open your project when you tap "Start Editing".
+        </p>
+      </section>
+
+      <section>
+        <h3 style="font-size: 0.9rem; margin: 0 0 8px;">${COPY.diagnosticsTitle}</h3>
+        <button
+          class="btn btn--sm"
+          ?disabled=${state.diagnosticsExporting || !state.connected}
+          @click=${state.onExportDiagnostics}
+          style="padding: 6px 14px; font-size: 0.82rem;"
+        >${state.diagnosticsExporting ? COPY.diagnosticsExporting : COPY.diagnosticsButton}</button>
+        <p style="font-size: 0.72rem; color: var(--muted); margin: 6px 0 0;">
+          ${COPY.diagnosticsDescription}
+        </p>
+      </section>
+
+      <section>
+        <h3 style="font-size: 0.9rem; margin: 0 0 8px;">AI Features (Optional)</h3>
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 8px;">
+          <input
+            type="checkbox"
+            .checked=${state.settings.aiFeaturesEnabled}
+            @change=${(e: Event) => state.onToggleAiFeatures((e.target as HTMLInputElement).checked)}
+          />
+          <span style="font-size: 0.85rem;">Enable local AI helpers</span>
+        </label>
+        <button
+          class="btn btn--sm"
+          @click=${state.onRunAiSetup}
+          style="padding: 6px 12px; font-size: 0.78rem;"
+        >Run AI setup</button>
+        <p style="font-size: 0.72rem; color: var(--muted); margin: 6px 0 0;">
+          Core import/backup features work without AI. You can enable AI now or later.
+        </p>
       </section>
 
       <section>

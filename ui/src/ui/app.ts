@@ -88,17 +88,9 @@ import {
 } from "./app-tool-stream.ts";
 import { normalizeAssistantIdentity } from "./assistant-identity.ts";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity.ts";
-import {
-  loadFolderTemplate,
-  saveFolderTemplate,
-  ALL_PRESETS,
-} from "./controllers/folder-template.ts";
-import { loadStorageConfig, saveStorageConfig, type StorageConfig } from "./controllers/storage.ts";
-import {
-  loadStudioProfile,
-  saveStudioProfile,
-  type StudioProfile,
-} from "./controllers/studio-profile.ts";
+import { loadFolderTemplate, ALL_PRESETS } from "./controllers/folder-template.ts";
+import { loadStorageConfig, formatPathLabel, type StorageConfig } from "./controllers/storage.ts";
+import { loadStudioProfile, type StudioProfile } from "./controllers/studio-profile.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
 
@@ -235,8 +227,15 @@ export class OpenClawApp extends LitElement {
   @state() studioFormValues: Record<string, string> = {};
   @state() studioIngestPendingSource: import("./controllers/ingest.ts").SuggestedSource | null =
     null;
+  // Import card options expanded
+  @state() importOptionsExpanded = false;
   // Settings sheet (normal mode overlay)
   @state() isSettingsSheetOpen = false;
+  // Diagnostics export
+  @state() diagnosticsExporting = false;
+  // Server-side settings sync
+  @state() serverSettingsLoaded = false;
+  private settingsSyncTimer: number | null = null;
 
   @state() nodesLoading = false;
   @state() nodes: Array<Record<string, unknown>> = [];
@@ -506,6 +505,49 @@ export class OpenClawApp extends LitElement {
 
   applySettings(next: UiSettings) {
     applySettingsInternal(this as unknown as Parameters<typeof applySettingsInternal>[0], next);
+    this.scheduleSettingsSync();
+  }
+
+  /** Debounced push of current settings to server (300ms). */
+  scheduleSettingsSync() {
+    if (!this.client || !this.serverSettingsLoaded) {
+      return;
+    }
+    if (this.settingsSyncTimer != null) {
+      window.clearTimeout(this.settingsSyncTimer);
+    }
+    this.settingsSyncTimer = window.setTimeout(() => {
+      this.settingsSyncTimer = null;
+      void this.pushSettingsToServer();
+    }, 300);
+  }
+
+  private async pushSettingsToServer() {
+    if (!this.client) {
+      return;
+    }
+    try {
+      const { pushServerSettings } = await import("./controllers/settings-sync.ts");
+      await pushServerSettings(this.client, {
+        preferences: {
+          theme: this.settings.theme,
+          developerMode: this.settings.developerMode,
+          defaultSaveLocation: this.settings.defaultSaveLocation,
+          defaultVerifyMode: this.settings.defaultVerifyMode,
+          chatFocusMode: this.settings.chatFocusMode,
+          chatShowThinking: this.settings.chatShowThinking,
+          splitRatio: this.settings.splitRatio,
+          navCollapsed: this.settings.navCollapsed,
+          navGroupsCollapsed: this.settings.navGroupsCollapsed,
+        },
+        storageConfig: this.storageConfig,
+        studioProfile: this.studioProfile.completedSetup ? this.studioProfile : null,
+        folderTemplate: this.folderTemplate,
+        recentProjects: this.ingestRecentProjects,
+      });
+    } catch (err) {
+      console.error("[settings-sync] push failed:", err);
+    }
   }
 
   setTab(next: Tab) {
@@ -784,14 +826,21 @@ export class OpenClawApp extends LitElement {
       this.ingestResult = result;
       this.ingestStage = "done";
       if (result.ok && result.project_root) {
-        saveRecentProject({
+        const newProject = {
           projectName: this.ingestProjectName.trim(),
           projectRoot: result.project_root,
           reportPath: result.report_path,
           destPath: this.ingestDestPath.trim(),
           sourcePath: this.ingestSourcePath.trim(),
           timestamp: Date.now(),
-        });
+        };
+        saveRecentProject(newProject);
+        // Update in-memory list and sync to server
+        const existing = this.ingestRecentProjects.filter(
+          (r) => r.projectRoot !== newProject.projectRoot,
+        );
+        this.ingestRecentProjects = [newProject, ...existing].slice(0, 5);
+        this.scheduleSettingsSync();
       }
     } catch (err) {
       this.ingestError = err instanceof Error ? err.message : String(err);
@@ -828,6 +877,40 @@ export class OpenClawApp extends LitElement {
     }
   }
 
+  async handleStartEditing() {
+    if (!this.client || !this.ingestResult?.project_root) {
+      return;
+    }
+    const editorHint = this.studioProfile.preferredEditor || "open_folder";
+    const { openWithEditor } = await import("./controllers/ingest.ts");
+    try {
+      await openWithEditor(
+        this.client,
+        this.ingestResult.project_root,
+        this.ingestResult.project_root,
+        editorHint,
+      );
+    } catch (err) {
+      console.error("Failed to open editor:", err);
+      // Fallback: reveal in Finder
+      void this.handleIngestRevealProject();
+    }
+  }
+
+  async handleOpenReviewFolder() {
+    if (!this.client || !this.ingestResult?.project_root) {
+      return;
+    }
+    const reviewFolder = this.ingestResult.review_folder;
+    const target = reviewFolder || this.ingestResult.project_root;
+    const { openPath } = await import("./controllers/ingest.ts");
+    try {
+      await openPath(this.client, target, this.ingestResult.project_root, true);
+    } catch (err) {
+      console.error("Failed to open review folder:", err);
+    }
+  }
+
   handleIngestToolUpdate(payload: { runId?: string; update?: unknown }) {
     if (this.ingestStage !== "running") {
       return;
@@ -855,68 +938,90 @@ export class OpenClawApp extends LitElement {
     }
   }
 
-  /** Update the Studio Manager timeline's status card with latest progress. */
+  /** Update the Studio Manager timeline's progress card with latest progress. */
   private updateStudioIngestProgress(p: IngestProgress) {
     if (this.settings.developerMode) {
       return; // Dev mode uses the old modal
     }
-    const statusIndex = this.studioTimeline.findIndex(
-      (e) => e.kind === "status" && e.id === "ingest-progress",
+    const progressIndex = this.studioTimeline.findIndex(
+      (e) => (e.kind === "stage-progress" || e.kind === "status") && e.id === "ingest-progress",
     );
-    if (statusIndex < 0) {
+    if (progressIndex < 0) {
       return;
     }
 
-    let statusLine: string;
-    let progressPercent = 0;
-    const counters: Array<{ label: string; value: string }> = [];
+    // Determine which stage is active
+    type StageStatus = "pending" | "active" | "done";
+    let copyStatus: StageStatus = "pending";
+    let verifyStatus: StageStatus = "pending";
+    let finalizeStatus: StageStatus = "pending";
+    let stageProgress = 0;
+    let statusLine = "Processing\u2026";
 
-    switch (p.type) {
-      case "ingest.start":
-      case "ingest.scan.progress":
-        statusLine = `Looking for photos\u2026 ${p.discovered_count ? `(${p.discovered_count} found)` : ""}`;
-        break;
-      case "ingest.copy.progress":
-        statusLine = `Copying photos\u2026 ${p.index ?? 0} of ${p.total ?? 0}`;
-        progressPercent = p.total ? Math.round(((p.index ?? 0) / p.total) * 100) : 0;
-        if (p.total) {
-          counters.push({ label: "Files", value: `${p.index ?? 0}/${p.total}` });
-        }
-        break;
-      case "ingest.verify.progress":
-        statusLine = "Double-checking everything is safe\u2026";
-        progressPercent = p.verified_total
-          ? Math.round(((p.verified_count ?? 0) / p.verified_total) * 100)
-          : 0;
-        break;
-      case "ingest.backup.start":
-      case "ingest.backup.copy.progress":
+    const copyEvents = [
+      "ingest.start",
+      "ingest.scan.progress",
+      "ingest.copy.progress",
+      "ingest.backup.start",
+      "ingest.backup.copy.progress",
+    ];
+    const verifyEvents = ["ingest.verify.progress", "ingest.backup.verify.progress"];
+    const finalizeEvents = [
+      "ingest.triage.start",
+      "ingest.triage.progress",
+      "ingest.triage.done",
+      "ingest.burst.progress",
+      "ingest.burst.done",
+      "ingest.report.generated",
+      "ingest.done",
+    ];
+
+    if (copyEvents.includes(p.type)) {
+      copyStatus = "active";
+      if (p.type === "ingest.copy.progress") {
+        stageProgress = p.total ? Math.round(((p.index ?? 0) / p.total) * 100) : 0;
+        statusLine = `${p.index ?? 0} of ${p.total ?? 0} files`;
+      } else if (p.type === "ingest.backup.copy.progress") {
+        stageProgress = p.total ? Math.round(((p.index ?? 0) / p.total) * 100) : 0;
         statusLine = `Backing up\u2026 ${p.index ? `${p.index} of ${p.total ?? 0}` : ""}`;
-        progressPercent = p.total ? Math.round(((p.index ?? 0) / p.total) * 100) : 0;
-        break;
-      case "ingest.backup.verify.progress":
-        statusLine = "Verifying backup\u2026";
-        break;
-      case "ingest.report.generated":
-        statusLine = "Writing Safety Report\u2026";
-        progressPercent = 95;
-        break;
-      case "ingest.done":
+      } else {
+        statusLine = p.discovered_count ? `${p.discovered_count} photos found` : "Scanning\u2026";
+      }
+    } else if (verifyEvents.includes(p.type)) {
+      copyStatus = "done";
+      verifyStatus = "active";
+      stageProgress = p.verified_total
+        ? Math.round(((p.verified_count ?? 0) / p.verified_total) * 100)
+        : 0;
+      statusLine = p.verified_total
+        ? `${p.verified_count ?? 0} of ${p.verified_total} checked`
+        : "Verifying\u2026";
+    } else if (finalizeEvents.includes(p.type)) {
+      copyStatus = "done";
+      verifyStatus = "done";
+      finalizeStatus = "active";
+      if (p.type === "ingest.done") {
+        finalizeStatus = "done";
+        stageProgress = 100;
         statusLine = "All done!";
-        progressPercent = 100;
-        break;
-      default:
-        statusLine = "Processing\u2026";
+      } else {
+        statusLine = "Writing Safety Report\u2026";
+      }
     }
 
     const updated = [...this.studioTimeline];
-    updated[statusIndex] = {
-      kind: "status" as const,
+    updated[progressIndex] = {
+      kind: "stage-progress" as const,
       id: "ingest-progress",
       role: "cullmate" as const,
+      projectName: this.ingestProjectName,
+      stages: [
+        { id: "copy", label: "Copying", status: copyStatus },
+        { id: "verify", label: "Verifying", status: verifyStatus },
+        { id: "finalize", label: "Finalizing report", status: finalizeStatus },
+      ],
+      currentStageProgress: stageProgress,
       statusLine,
-      progressPercent,
-      counters: counters.length > 0 ? counters : undefined,
     };
     this.studioTimeline = updated;
   }
@@ -944,16 +1049,16 @@ export class OpenClawApp extends LitElement {
   }
 
   handleSaveFolderTemplate(t: FolderTemplate) {
-    saveFolderTemplate(t);
     this.folderTemplate = t;
     this.isFolderTemplatePickerOpen = false;
+    this.scheduleSettingsSync();
   }
 
   handleSkipFolderTemplate() {
     // Save the classic preset as default
-    saveFolderTemplate(ALL_PRESETS[0]);
     this.folderTemplate = ALL_PRESETS[0];
     this.isFolderTemplatePickerOpen = false;
+    this.scheduleSettingsSync();
   }
 
   async checkSmartOrganizerStatus() {
@@ -1060,19 +1165,39 @@ export class OpenClawApp extends LitElement {
   }
 
   handleSaveStorageSetup(cfg: StorageConfig) {
-    saveStorageConfig(cfg);
     this.storageConfig = cfg;
     this.isStorageSetupOpen = false;
     // Update ingest dest path if the import modal is open
     if (this.ingestStage === "prompting") {
       this.ingestDestPath = cfg.primaryDest;
     }
+    this.scheduleSettingsSync();
   }
 
   handleSaveStudioProfile(profile: StudioProfile) {
-    saveStudioProfile(profile);
     this.studioProfile = profile;
     this.isStudioProfileOpen = false;
+    this.scheduleSettingsSync();
+  }
+
+  async handleExportDiagnostics() {
+    if (!this.client || this.diagnosticsExporting) {
+      return;
+    }
+    this.diagnosticsExporting = true;
+    try {
+      const { exportDiagnostics, buildSafeSettingsSnapshot } =
+        await import("./controllers/diagnostics.ts");
+      const snapshot = buildSafeSettingsSnapshot(
+        this.settings as unknown as Record<string, unknown>,
+        this.storageConfig ? (this.storageConfig as unknown as Record<string, unknown>) : {},
+      );
+      await exportDiagnostics(this.client, { settingsSnapshot: snapshot });
+    } catch {
+      // Errors are expected if user cancels the save dialog.
+    } finally {
+      this.diagnosticsExporting = false;
+    }
   }
 
   async handleStoragePickPrimary() {
@@ -1177,15 +1302,47 @@ export class OpenClawApp extends LitElement {
           enabled: false,
           completedSetup: true,
         };
-        saveStudioProfile(this.studioProfile);
+        this.scheduleSettingsSync();
+        this.rebuildStudioTimeline();
+        break;
+      case "open-ai-setup":
+        this.applySettings({
+          ...this.settings,
+          aiFeaturesEnabled: true,
+          aiOnboardingDone: true,
+        });
+        this.isSettingsSheetOpen = true;
+        void this.checkSmartOrganizerStatus();
+        this.rebuildStudioTimeline();
+        break;
+      case "skip-ai-setup":
+        this.applySettings({
+          ...this.settings,
+          aiFeaturesEnabled: false,
+          aiOnboardingDone: true,
+        });
         this.rebuildStudioTimeline();
         break;
       case "open-import":
         if (this.settings.developerMode) {
           void this.handleIngestOpen();
         } else {
-          // Normal mode: open the ingest modal for source picking, but results show inline
-          void this.handleIngestOpen();
+          // Normal mode: show import card with no source (user picks folder)
+          this.studioIngestPendingSource = null;
+          this.importOptionsExpanded = false;
+          void import("./controllers/studio-manager.ts").then(({ buildImportTimeline }) => {
+            const destPath = this.storageConfig?.primaryDest || "~/Pictures/BaxBot";
+            this.studioTimeline = buildImportTimeline({
+              source: null,
+              projectName: "",
+              saveTo: destPath,
+              saveToLabel: formatPathLabel(destPath),
+              verifyMode:
+                (this.settings.defaultVerifyMode as "none" | "sentinel" | "full") || "sentinel",
+              dedupeEnabled: false,
+              folderTemplateName: this.folderTemplate?.name || "Classic",
+            });
+          });
         }
         break;
       case "open-settings":
@@ -1196,21 +1353,58 @@ export class OpenClawApp extends LitElement {
           if (this.settings.developerMode) {
             this.handleIngestSelectSuggestedSource(this.ingestSuggestedSources[0]);
           } else {
-            // Show naming form before starting ingest
-            this.studioIngestPendingSource = this.ingestSuggestedSources[0];
-            const smartName = suggestProjectNameClient(this.studioIngestPendingSource.path);
-            this.studioFormValues = { ...this.studioFormValues, "project-name": smartName };
-            void import("./controllers/studio-manager.ts").then(({ buildNamingTimeline }) => {
-              this.studioTimeline = buildNamingTimeline({
-                sourceLabel:
-                  this.studioIngestPendingSource?.label ||
-                  this.studioIngestPendingSource?.path ||
-                  "",
-                smartSuggestion: smartName,
+            // Show import card with auto-populated fields
+            const detectedSource = this.ingestSuggestedSources[0];
+            this.studioIngestPendingSource = detectedSource;
+            const smartName = suggestProjectNameClient(detectedSource.path);
+            this.studioFormValues = { ...this.studioFormValues, "import-project-name": smartName };
+            this.importOptionsExpanded = false;
+            void import("./controllers/studio-manager.ts").then(({ buildImportTimeline }) => {
+              const destPath = this.storageConfig?.primaryDest || "~/Pictures/BaxBot";
+              this.studioTimeline = buildImportTimeline({
+                source: {
+                  label: detectedSource.label || formatPathLabel(detectedSource.path),
+                  path: detectedSource.path,
+                },
+                projectName: smartName,
+                saveTo: destPath,
+                saveToLabel: formatPathLabel(destPath),
+                verifyMode:
+                  (this.settings.defaultVerifyMode as "none" | "sentinel" | "full") || "sentinel",
+                dedupeEnabled: false,
+                folderTemplateName: this.folderTemplate?.name || "Classic",
               });
             });
           }
         }
+        break;
+      case "start-import": {
+        // Read project name from form values and start ingest
+        const importProjectName = (this.studioFormValues["import-project-name"] ?? "").trim();
+        if (this.studioIngestPendingSource && importProjectName) {
+          void this.handleStudioIngestWithName(this.studioIngestPendingSource, importProjectName);
+        }
+        break;
+      }
+      case "toggle-import-options":
+        this.importOptionsExpanded = !this.importOptionsExpanded;
+        this.updateImportCardOptions();
+        break;
+      case "change-save-location":
+        this.handleOpenStorageSetup();
+        break;
+      case "choose-import-folder":
+        void this.handleIngestPickSource().then(() => {
+          if (this.ingestSourcePath) {
+            this.studioIngestPendingSource = {
+              label: formatPathLabel(this.ingestSourcePath),
+              path: this.ingestSourcePath,
+            };
+            const smartName2 = suggestProjectNameClient(this.ingestSourcePath);
+            this.studioFormValues = { ...this.studioFormValues, "import-project-name": smartName2 };
+            this.updateImportCardSource();
+          }
+        });
         break;
       case "dismiss-detected":
         this.studioTimeline = this.studioTimeline.filter(
@@ -1231,22 +1425,32 @@ export class OpenClawApp extends LitElement {
       case "studio-reveal-project":
         void this.handleIngestRevealProject();
         break;
-      case "studio-import-lightroom":
-        // Lightroom import — reveal project folder for now
-        void this.handleIngestRevealProject();
+      case "studio-start-editing":
+        void this.handleStartEditing();
+        break;
+      case "studio-open-review-folder":
+        void this.handleOpenReviewFolder();
         break;
       case "studio-show-unreadable":
       case "studio-show-junk":
-        // Open the Safety Report (triage details are inside)
         void this.handleIngestOpenReport();
         break;
       default:
+        if (action.startsWith("import-set-verify:")) {
+          const mode = action.slice("import-set-verify:".length) as "none" | "sentinel" | "full";
+          this.updateImportCardVerifyMode(mode);
+          break;
+        }
+        if (action === "import-toggle-dedupe") {
+          this.updateImportCardDedupe();
+          break;
+        }
         if (action.startsWith("select-layout:")) {
           const templateId = action.slice("select-layout:".length);
           const preset = ALL_PRESETS.find((p) => p.template_id === templateId);
           if (preset) {
-            saveFolderTemplate(preset);
             this.folderTemplate = preset;
+            this.scheduleSettingsSync();
             this.rebuildStudioTimeline();
           }
         } else if (action.startsWith("open-recent:")) {
@@ -1275,7 +1479,7 @@ export class OpenClawApp extends LitElement {
     const projectName = suggestProjectNameClient(sourcePath);
     const { COPY } = await import("./copy/studio-manager-copy.ts");
 
-    // Replace the action cards with a status card
+    // Replace the action cards with a stage progress card
     this.studioTimeline = [
       {
         kind: "text" as const,
@@ -1284,11 +1488,17 @@ export class OpenClawApp extends LitElement {
         body: `Saving photos from ${source.label || sourcePath.split("/").pop() || sourcePath}\u2026`,
       },
       {
-        kind: "status" as const,
+        kind: "stage-progress" as const,
         id: "ingest-progress",
         role: "cullmate" as const,
+        projectName,
+        stages: [
+          { id: "copy", label: COPY.stageCopying, status: "active" as const },
+          { id: "verify", label: COPY.stageVerifying, status: "pending" as const },
+          { id: "finalize", label: COPY.stageFinalizing, status: "pending" as const },
+        ],
+        currentStageProgress: 0,
         statusLine: COPY.statusScanning,
-        progressPercent: 0,
       },
     ];
 
@@ -1338,37 +1548,59 @@ export class OpenClawApp extends LitElement {
         });
       }
 
-      // Show result card in timeline
+      // Build badges
       const safeToFormat = result.safe_to_format ?? null;
-      const triageDetail =
-        !safeToFormat && result.triage?.unreadable_count
-          ? `${result.triage.unreadable_count} file${result.triage.unreadable_count === 1 ? "" : "s"} could not be read and may be damaged. Check the Safety Report before formatting your cards.`
-          : undefined;
+      const burstCount = result.bursts?.burst_count ?? 0;
+      const summaryBody = safeToFormat
+        ? COPY.completionSafe(result.totals?.success_count ?? 0, burstCount)
+        : COPY.completionUnsafe(
+            result.totals?.success_count ?? 0,
+            result.triage?.unreadable_count ?? 0,
+          );
+
+      const badges: Array<{
+        label: string;
+        variant: "safe" | "unsafe" | "neutral";
+        action?: string;
+      }> = [];
+      if (safeToFormat !== null) {
+        badges.push({
+          label: safeToFormat ? "Safe to format: YES" : "Safe to format: NO",
+          variant: safeToFormat ? "safe" : "unsafe",
+        });
+      }
+      if (result.totals) {
+        const copyCount = this.storageConfig?.backupDest ? 2 : 1;
+        badges.push({ label: COPY.completionCopies(copyCount), variant: "neutral" });
+      }
+      if (result.report_path) {
+        badges.push({
+          label: COPY.completionReceipt,
+          variant: "neutral",
+          action: "studio-open-report",
+        });
+      }
+
       this.studioTimeline = [
         {
           kind: "text" as const,
-          id: "ingest-started",
+          id: "ingest-done-summary",
           role: "cullmate" as const,
-          body: COPY.statusDone,
+          body: summaryBody,
         },
         {
           kind: "result" as const,
           id: "ingest-result",
           role: "cullmate" as const,
           safeToFormat,
-          headline: safeToFormat ? COPY.safeToFormatYes : COPY.safeToFormatNotYet,
-          detail:
-            triageDetail ?? (safeToFormat ? COPY.safeToFormatYesDetail : COPY.safeToFormatNoDetail),
+          headline: COPY.completionHeadline,
+          verdict: safeToFormat ? COPY.safeToFormatYes : COPY.safeToFormatNotYet,
+          detail: safeToFormat ? COPY.safeToFormatYesDetail : COPY.safeToFormatNoDetail,
           buttons: [
-            { label: COPY.openSafetyReport, action: "studio-open-report" },
-            { label: COPY.openInFinder, action: "studio-reveal-project" },
-            ...(result.triage?.unreadable_count
-              ? [{ label: COPY.triageShowUnreadable, action: "studio-show-unreadable" }]
-              : []),
-            ...(result.triage?.black_frame_count
-              ? [{ label: COPY.triageShowJunk, action: "studio-show-junk" }]
-              : []),
+            { label: COPY.completionShowFinder, action: "studio-reveal-project" },
+            { label: COPY.startEditing, action: "studio-start-editing" },
           ],
+          badges,
           counters: result.totals
             ? [
                 { label: "Copied", value: String(result.totals.success_count) },
@@ -1386,6 +1618,13 @@ export class OpenClawApp extends LitElement {
                 blackFrameCount: result.triage.black_frame_count,
               }
             : undefined,
+          burstSummary: result.bursts
+            ? {
+                burstCount: result.bursts.burst_count,
+                bestPickCount: result.bursts.best_pick_count,
+              }
+            : undefined,
+          reviewFolder: result.review_folder,
         },
       ];
     } catch (err) {
@@ -1430,7 +1669,15 @@ export class OpenClawApp extends LitElement {
     const trimmedName = projectName.trim() || suggestProjectNameClient(sourcePath);
     const { COPY } = await import("./copy/studio-manager-copy.ts");
 
-    // Replace the action cards with a status card
+    // Read import card settings if present
+    const importCard = this.studioTimeline.find((e) => e.kind === "import");
+    const verifyMode =
+      importCard?.verifyMode ??
+      (this.settings.defaultVerifyMode as "none" | "sentinel" | "full") ??
+      "sentinel";
+    const dedupeEnabled = importCard?.dedupeEnabled ?? false;
+
+    // Replace the action cards with a stage progress card
     this.studioTimeline = [
       {
         kind: "text" as const,
@@ -1439,11 +1686,17 @@ export class OpenClawApp extends LitElement {
         body: `Saving photos from ${source.label || sourcePath.split("/").pop() || sourcePath}\u2026`,
       },
       {
-        kind: "status" as const,
+        kind: "stage-progress" as const,
         id: "ingest-progress",
         role: "cullmate" as const,
+        projectName: trimmedName,
+        stages: [
+          { id: "copy", label: COPY.stageCopying, status: "active" as const },
+          { id: "verify", label: COPY.stageVerifying, status: "pending" as const },
+          { id: "finalize", label: COPY.stageFinalizing, status: "pending" as const },
+        ],
+        currentStageProgress: 0,
         statusLine: COPY.statusScanning,
-        progressPercent: 0,
       },
     ];
 
@@ -1470,10 +1723,10 @@ export class OpenClawApp extends LitElement {
         source_path: sourcePath,
         dest_project_path: destPath,
         project_name: trimmedName,
-        verify_mode: this.settings.defaultVerifyMode || "none",
+        verify_mode: verifyMode,
         hash_algo: "blake3",
         overwrite: false,
-        dedupe: false,
+        dedupe: dedupeEnabled,
         backup_dest: this.storageConfig.backupDest || undefined,
         folder_template: this.folderTemplate ?? undefined,
         xmp_patch: xmpPatch,
@@ -1493,40 +1746,59 @@ export class OpenClawApp extends LitElement {
         });
       }
 
-      // Show project card with shoot name as headline
+      // Build badges
       const safeToFormat = result.safe_to_format ?? null;
-      const triageDetail2 =
-        !safeToFormat && result.triage?.unreadable_count
-          ? `${result.triage.unreadable_count} file${result.triage.unreadable_count === 1 ? "" : "s"} could not be read and may be damaged. Check the Safety Report before formatting your cards.`
-          : undefined;
+      const burstCount2 = result.bursts?.burst_count ?? 0;
+      const summaryBody2 = safeToFormat
+        ? COPY.completionSafe(result.totals?.success_count ?? 0, burstCount2)
+        : COPY.completionUnsafe(
+            result.totals?.success_count ?? 0,
+            result.triage?.unreadable_count ?? 0,
+          );
+
+      const badges: Array<{
+        label: string;
+        variant: "safe" | "unsafe" | "neutral";
+        action?: string;
+      }> = [];
+      if (safeToFormat !== null) {
+        badges.push({
+          label: safeToFormat ? "Safe to format: YES" : "Safe to format: NO",
+          variant: safeToFormat ? "safe" : "unsafe",
+        });
+      }
+      if (result.totals) {
+        const copyCount = this.storageConfig?.backupDest ? 2 : 1;
+        badges.push({ label: COPY.completionCopies(copyCount), variant: "neutral" });
+      }
+      if (result.report_path) {
+        badges.push({
+          label: COPY.completionReceipt,
+          variant: "neutral",
+          action: "studio-open-report",
+        });
+      }
+
       this.studioTimeline = [
         {
           kind: "text" as const,
-          id: "ingest-started",
+          id: "ingest-done-summary",
           role: "cullmate" as const,
-          body: COPY.statusDone,
+          body: summaryBody2,
         },
         {
           kind: "result" as const,
           id: "ingest-result",
           role: "cullmate" as const,
           safeToFormat,
-          headline: trimmedName,
+          headline: COPY.completionHeadline,
           verdict: safeToFormat ? COPY.safeToFormatYes : COPY.safeToFormatNotYet,
-          detail:
-            triageDetail2 ??
-            (safeToFormat ? COPY.safeToFormatYesDetail : COPY.safeToFormatNoDetail),
+          detail: safeToFormat ? COPY.safeToFormatYesDetail : COPY.safeToFormatNoDetail,
           buttons: [
-            { label: COPY.openFolder, action: "studio-reveal-project" },
-            { label: COPY.openSafetyReport, action: "studio-open-report" },
-            { label: COPY.importToLightroom, action: "studio-import-lightroom" },
-            ...(result.triage?.unreadable_count
-              ? [{ label: COPY.triageShowUnreadable, action: "studio-show-unreadable" }]
-              : []),
-            ...(result.triage?.black_frame_count
-              ? [{ label: COPY.triageShowJunk, action: "studio-show-junk" }]
-              : []),
+            { label: COPY.completionShowFinder, action: "studio-reveal-project" },
+            { label: COPY.startEditing, action: "studio-start-editing" },
           ],
+          badges,
           counters: result.totals
             ? [
                 { label: "Copied", value: String(result.totals.success_count) },
@@ -1544,6 +1816,13 @@ export class OpenClawApp extends LitElement {
                 blackFrameCount: result.triage.black_frame_count,
               }
             : undefined,
+          burstSummary: result.bursts
+            ? {
+                burstCount: result.bursts.burst_count,
+                bestPickCount: result.bursts.best_pick_count,
+              }
+            : undefined,
+          reviewFolder: result.review_folder,
         },
       ];
     } catch (err) {
@@ -1568,6 +1847,64 @@ export class OpenClawApp extends LitElement {
     }
   }
 
+  /** Update import card's options expanded state in the timeline. */
+  private updateImportCardOptions() {
+    const idx = this.studioTimeline.findIndex((e) => e.kind === "import");
+    if (idx < 0) {
+      return;
+    }
+    const card = this.studioTimeline[idx] as import("./controllers/studio-manager.ts").ImportCard;
+    const updated = [...this.studioTimeline];
+    updated[idx] = { ...card, optionsExpanded: this.importOptionsExpanded };
+    this.studioTimeline = updated;
+  }
+
+  /** Update import card's verify mode in the timeline. */
+  private updateImportCardVerifyMode(mode: "none" | "sentinel" | "full") {
+    const idx = this.studioTimeline.findIndex((e) => e.kind === "import");
+    if (idx < 0) {
+      return;
+    }
+    const card = this.studioTimeline[idx] as import("./controllers/studio-manager.ts").ImportCard;
+    const updated = [...this.studioTimeline];
+    updated[idx] = { ...card, verifyMode: mode };
+    this.studioTimeline = updated;
+  }
+
+  /** Toggle import card's dedupe in the timeline. */
+  private updateImportCardDedupe() {
+    const idx = this.studioTimeline.findIndex((e) => e.kind === "import");
+    if (idx < 0) {
+      return;
+    }
+    const card = this.studioTimeline[idx] as import("./controllers/studio-manager.ts").ImportCard;
+    const updated = [...this.studioTimeline];
+    updated[idx] = { ...card, dedupeEnabled: !card.dedupeEnabled };
+    this.studioTimeline = updated;
+  }
+
+  /** Update import card's source after folder pick. */
+  private updateImportCardSource() {
+    const idx = this.studioTimeline.findIndex((e) => e.kind === "import");
+    if (idx < 0) {
+      return;
+    }
+    const card = this.studioTimeline[idx] as import("./controllers/studio-manager.ts").ImportCard;
+    const updated = [...this.studioTimeline];
+    updated[idx] = {
+      ...card,
+      source: this.studioIngestPendingSource
+        ? {
+            label:
+              this.studioIngestPendingSource.label ||
+              formatPathLabel(this.studioIngestPendingSource.path),
+            path: this.studioIngestPendingSource.path,
+          }
+        : null,
+    };
+    this.studioTimeline = updated;
+  }
+
   rebuildStudioTimeline() {
     void import("./controllers/studio-manager.ts").then(({ buildStarterTimeline }) => {
       this.studioTimeline = buildStarterTimeline({
@@ -1576,6 +1913,7 @@ export class OpenClawApp extends LitElement {
         hasStorageConfig: !!this.storageConfig,
         hasFolderTemplate: !!this.folderTemplate,
         hasCompletedProfileSetup: this.studioProfile.completedSetup,
+        hasAiOnboardingDone: this.settings.aiOnboardingDone,
         presets: ALL_PRESETS,
       });
     });
