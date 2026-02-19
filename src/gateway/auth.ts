@@ -103,6 +103,16 @@ export function isLocalDirectRequest(req?: IncomingMessage, trustedProxies?: str
     req.headers?.["x-forwarded-host"],
   );
 
+  // When the raw TCP socket is loopback with no proxy headers, the connection
+  // is provably from this machine (kernel-enforced). Skip the Host header
+  // check — it only guards against proxied traffic, and non-standard Host
+  // values (0.0.0.0, empty, machine hostname) would otherwise cause false
+  // token_missing rejections for genuine local clients.
+  const rawRemoteIsLoopback = isLoopbackAddress(req.socket?.remoteAddress);
+  if (rawRemoteIsLoopback && !hasForwarded) {
+    return true;
+  }
+
   const remoteIsTrustedProxy = isTrustedProxyAddress(req.socket?.remoteAddress, trustedProxies);
   return (hostIsLocal || hostIsTailscaleServe) && (!hasForwarded || remoteIsTrustedProxy);
 }
@@ -183,8 +193,13 @@ export function resolveGatewayAuth(params: {
 }): ResolvedGatewayAuth {
   const authConfig = params.authConfig ?? {};
   const env = params.env ?? process.env;
-  const token = authConfig.token ?? env.OPENCLAW_GATEWAY_TOKEN ?? undefined;
-  const password = authConfig.password ?? env.OPENCLAW_GATEWAY_PASSWORD ?? undefined;
+  const token =
+    authConfig.token ?? env.BAXBOT_GATEWAY_TOKEN ?? env.OPENCLAW_GATEWAY_TOKEN ?? undefined;
+  const password =
+    authConfig.password ??
+    env.BAXBOT_GATEWAY_PASSWORD ??
+    env.OPENCLAW_GATEWAY_PASSWORD ??
+    undefined;
   const trustedProxy = authConfig.trustedProxy;
 
   let mode: ResolvedGatewayAuth["mode"];
@@ -217,7 +232,7 @@ export function assertGatewayAuthConfigured(auth: ResolvedGatewayAuth): void {
       return;
     }
     throw new Error(
-      "gateway auth mode is token, but no token was configured (set gateway.auth.token or OPENCLAW_GATEWAY_TOKEN)",
+      "gateway auth mode is token, but no token was configured (set gateway.auth.token or BAXBOT_GATEWAY_TOKEN)",
     );
   }
   if (auth.mode === "password" && !auth.password) {
@@ -315,6 +330,12 @@ export async function authorizeGatewayConnect(params: {
       return { ok: true, method: "trusted-proxy", user: result.user };
     }
     return { ok: false, reason: result.reason };
+  }
+
+  // BaxBot local UX: for direct loopback usage on the same machine,
+  // allow connection without prompting users for tokens/passwords.
+  if (localDirect && auth.mode !== "trusted-proxy") {
+    return { ok: true, method: "shared_secret" };
   }
 
   const limiter = params.rateLimiter;

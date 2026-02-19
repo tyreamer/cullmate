@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AuthRateLimiter } from "./auth-rate-limit.js";
-import { authorizeGatewayConnect, resolveGatewayAuth } from "./auth.js";
+import { authorizeGatewayConnect, isLocalDirectRequest, resolveGatewayAuth } from "./auth.js";
 
 function createLimiterSpy(): AuthRateLimiter & {
   check: ReturnType<typeof vi.fn>;
@@ -121,7 +121,7 @@ describe("gateway auth", () => {
     });
 
     expect(res.ok).toBe(true);
-    expect(res.method).toBe("token");
+    expect(res.method).toBe("shared_secret");
   });
 
   it("allows tailscale identity to satisfy token mode auth", async () => {
@@ -179,6 +179,132 @@ describe("gateway auth", () => {
     expect(res.reason).toBe("password_mismatch");
     expect(limiter.check).toHaveBeenCalledWith(undefined, "custom-scope");
     expect(limiter.recordFailure).toHaveBeenCalledWith(undefined, "custom-scope");
+  });
+});
+
+describe("local loopback trust", () => {
+  function makeReq(remoteAddress: string, host?: string, extraHeaders?: Record<string, string>) {
+    return {
+      socket: { remoteAddress },
+      headers: { ...(host !== undefined ? { host } : {}), ...extraHeaders },
+    } as never;
+  }
+
+  it("trusts loopback with standard localhost Host", () => {
+    expect(isLocalDirectRequest(makeReq("127.0.0.1", "localhost:18789"))).toBe(true);
+  });
+
+  it("trusts loopback with 127.0.0.1 Host", () => {
+    expect(isLocalDirectRequest(makeReq("127.0.0.1", "127.0.0.1:19001"))).toBe(true);
+  });
+
+  it("trusts loopback with 0.0.0.0 Host (wildcard bind)", () => {
+    expect(isLocalDirectRequest(makeReq("127.0.0.1", "0.0.0.0:19001"))).toBe(true);
+  });
+
+  it("trusts loopback with missing Host header", () => {
+    expect(isLocalDirectRequest(makeReq("127.0.0.1"))).toBe(true);
+  });
+
+  it("trusts loopback with machine hostname Host", () => {
+    expect(isLocalDirectRequest(makeReq("127.0.0.1", "my-macbook.local:18789"))).toBe(true);
+  });
+
+  it("trusts IPv4-mapped IPv6 loopback (::ffff:127.0.0.1)", () => {
+    expect(isLocalDirectRequest(makeReq("::ffff:127.0.0.1", "127.0.0.1:19001"))).toBe(true);
+  });
+
+  it("trusts IPv6 loopback (::1)", () => {
+    expect(isLocalDirectRequest(makeReq("::1", "[::1]:18789"))).toBe(true);
+  });
+
+  it("rejects non-loopback remote address", () => {
+    expect(isLocalDirectRequest(makeReq("192.168.1.100", "localhost:18789"))).toBe(false);
+  });
+
+  it("rejects loopback with untrusted forwarding headers", () => {
+    expect(
+      isLocalDirectRequest(
+        makeReq("127.0.0.1", "127.0.0.1:18789", { "x-forwarded-for": "203.0.113.10" }),
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects loopback proxy forwarding remote client even when trusted", () => {
+    // Proxy at 127.0.0.1 forwards a remote client — resolved client IP is remote.
+    expect(
+      isLocalDirectRequest(
+        makeReq("127.0.0.1", "127.0.0.1:18789", { "x-forwarded-for": "203.0.113.10" }),
+        ["127.0.0.1"],
+      ),
+    ).toBe(false);
+  });
+
+  it("bypasses token auth for loopback with non-standard Host", async () => {
+    const res = await authorizeGatewayConnect({
+      auth: { mode: "token", token: "secret", allowTailscale: false },
+      connectAuth: null,
+      req: makeReq("127.0.0.1", "0.0.0.0:19001"),
+    });
+    expect(res.ok).toBe(true);
+    expect(res.method).toBe("shared_secret");
+  });
+
+  it("bypasses password auth for loopback with missing Host", async () => {
+    const res = await authorizeGatewayConnect({
+      auth: { mode: "password", password: "secret", allowTailscale: false },
+      connectAuth: null,
+      req: makeReq("127.0.0.1"),
+    });
+    expect(res.ok).toBe(true);
+    expect(res.method).toBe("shared_secret");
+  });
+});
+
+describe("BAXBOT env var resolution", () => {
+  it("resolves token/password from BAXBOT gateway env vars", () => {
+    expect(
+      resolveGatewayAuth({
+        authConfig: {},
+        env: {
+          BAXBOT_GATEWAY_TOKEN: "baxbot-token",
+          BAXBOT_GATEWAY_PASSWORD: "baxbot-password",
+        } as NodeJS.ProcessEnv,
+      }),
+    ).toMatchObject({
+      mode: "password",
+      token: "baxbot-token",
+      password: "baxbot-password",
+    });
+  });
+
+  it("prefers BAXBOT env vars over OPENCLAW env vars", () => {
+    expect(
+      resolveGatewayAuth({
+        authConfig: {},
+        env: {
+          BAXBOT_GATEWAY_TOKEN: "baxbot-token",
+          OPENCLAW_GATEWAY_TOKEN: "openclaw-token",
+        } as NodeJS.ProcessEnv,
+      }),
+    ).toMatchObject({
+      mode: "token",
+      token: "baxbot-token",
+    });
+  });
+
+  it("falls back to OPENCLAW env vars when BAXBOT vars absent", () => {
+    expect(
+      resolveGatewayAuth({
+        authConfig: {},
+        env: {
+          OPENCLAW_GATEWAY_TOKEN: "openclaw-token",
+        } as NodeJS.ProcessEnv,
+      }),
+    ).toMatchObject({
+      mode: "token",
+      token: "openclaw-token",
+    });
   });
 });
 
