@@ -308,11 +308,11 @@ export async function finalizeOnboardingWizard(
     await prompter.note(
       [
         "Gateway token: shared auth for the Gateway + Control UI.",
-        "Stored in: ~/.openclaw/openclaw.json (gateway.auth.token) or OPENCLAW_GATEWAY_TOKEN.",
-        `View token: ${formatCliCommand("openclaw config get gateway.auth.token")}`,
-        `Generate token: ${formatCliCommand("openclaw doctor --generate-gateway-token")}`,
-        "Web UI stores a copy in this browser's localStorage (openclaw.control.settings.v1).",
-        `Open the dashboard anytime: ${formatCliCommand("openclaw dashboard --no-open")}`,
+        "Stored in: ~/.baxbot/baxbot.json (gateway.auth.token) or BAXBOT_GATEWAY_TOKEN.",
+        `View token: ${formatCliCommand("baxbot config get gateway.auth.token")}`,
+        `Generate token: ${formatCliCommand("baxbot doctor --generate-gateway-token")}`,
+        "Web UI stores a copy in this browser's localStorage (compat key: openclaw.control.settings.v1).",
+        `Open the dashboard anytime: ${formatCliCommand("baxbot dashboard --no-open")}`,
         "If prompted: paste the token into Control UI settings (or use the tokenized dashboard URL).",
       ].join("\n"),
       "Token",
@@ -371,7 +371,7 @@ export async function finalizeOnboardingWizard(
       );
     } else {
       await prompter.note(
-        `When you're ready: ${formatCliCommand("openclaw dashboard --no-open")}`,
+        `When you're ready: ${formatCliCommand("baxbot dashboard --no-open")}`,
         "Later",
       );
     }

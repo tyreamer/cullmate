@@ -59,9 +59,7 @@ describe("ports helpers", () => {
     ).catch(() => {});
 
     const messages = runtime.error.mock.calls.map((call) => stripAnsi(String(call[0] ?? "")));
-    expect(messages.join("\n")).toContain(
-      "another BaxBot/OpenClaw-style gateway is already running",
-    );
+    expect(messages.join("\n")).toContain("another BaxBot-compatible gateway is already running");
   });
 
   it("classifies ssh and gateway listeners", () => {

@@ -87,7 +87,7 @@ export async function runOnboardingWizard(
       );
     }
     await prompter.outro(
-      `Config invalid. Run \`${formatCliCommand("openclaw doctor")}\` to repair it, then re-run onboarding.`,
+      `Config invalid. Run \`${formatCliCommand("baxbot doctor")}\` to repair it, then re-run onboarding.`,
     );
     runtime.exit(1);
     return;
