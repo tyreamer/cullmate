@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { connectGateway } from "./app-gateway.ts";
 
 type GatewayClientMock = {
@@ -71,7 +71,7 @@ function createHost() {
     agentsList: null,
     agentsError: null,
     debugHealth: null,
-    assistantName: "OpenClaw",
+    assistantName: "BaxBot",
     assistantAvatar: null,
     assistantAgentId: null,
     sessionKey: "main",
@@ -84,7 +84,12 @@ function createHost() {
 
 describe("connectGateway", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     gatewayClientInstances.length = 0;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("ignores stale client onGap callbacks after reconnect", () => {
@@ -142,5 +147,49 @@ describe("connectGateway", () => {
 
     secondClient.emitClose(1005);
     expect(host.lastError).toBe("disconnected (1005): no reason");
+  });
+
+  it("sets actionable error when gateway is unreachable after timeout", () => {
+    const host = createHost();
+    connectGateway(host);
+
+    expect(host.lastError).toBeNull();
+    expect(host.connected).toBe(false);
+
+    // Advance past the 5s connect timeout
+    vi.advanceTimersByTime(5_000);
+
+    expect(host.lastError).toBe(
+      "Unable to reach gateway at ws://127.0.0.1:18789. Check that the gateway is running.",
+    );
+    expect(host.connected).toBe(false);
+  });
+
+  it("does not set timeout error if connected before timeout fires", () => {
+    const host = createHost();
+    connectGateway(host);
+
+    // Simulate a successful connection before the timeout
+    host.connected = true;
+    vi.advanceTimersByTime(5_000);
+
+    // lastError should stay null because we connected in time
+    expect(host.lastError).toBeNull();
+  });
+
+  it("does not set timeout error for a stale client after reconnect", () => {
+    const host = createHost();
+    connectGateway(host);
+
+    // Reconnect replaces the client
+    connectGateway(host);
+
+    // First client's timeout fires, but the client is stale
+    vi.advanceTimersByTime(5_000);
+
+    // The error should reference the second client's URL, not be doubled
+    expect(host.lastError).toBe(
+      "Unable to reach gateway at ws://127.0.0.1:18789. Check that the gateway is running.",
+    );
   });
 });

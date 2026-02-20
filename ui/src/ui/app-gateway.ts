@@ -115,6 +115,9 @@ function applySessionDefaults(host: GatewayHost, defaults?: SessionDefaultsSnaps
   }
 }
 
+/** Seconds to wait before showing a connection error instead of the spinner. */
+const CONNECT_TIMEOUT_MS = 5_000;
+
 export function connectGateway(host: GatewayHost) {
   host.lastError = null;
   host.hello = null;
@@ -133,6 +136,12 @@ export function connectGateway(host: GatewayHost) {
   const effectiveToken = host.settings.token.trim() || metaToken || bootstrapToken || undefined;
 
   const previousClient = host.client;
+  const connectTimer = window.setTimeout(() => {
+    if (host.client === client && !host.connected) {
+      host.lastError = `Unable to reach gateway at ${host.settings.gatewayUrl}. Check that the gateway is running.`;
+    }
+  }, CONNECT_TIMEOUT_MS);
+
   const client = new GatewayBrowserClient({
     url: host.settings.gatewayUrl,
     token: effectiveToken,
@@ -143,6 +152,7 @@ export function connectGateway(host: GatewayHost) {
       if (host.client !== client) {
         return;
       }
+      window.clearTimeout(connectTimer);
       host.connected = true;
       host.lastError = null;
       host.hello = hello;
@@ -158,6 +168,8 @@ export function connectGateway(host: GatewayHost) {
       void loadNodes(host as unknown as OpenClawApp, { quiet: true });
       void loadDevices(host as unknown as OpenClawApp, { quiet: true });
       void refreshActiveTab(host as unknown as Parameters<typeof refreshActiveTab>[0]);
+      // Load server-persisted settings (storage config, profile, template, etc.)
+      void loadServerSettings(host as unknown as OpenClawApp);
       // Open deferred modal (e.g. ?modal=ingest) after gateway is ready
       (host as unknown as { consumePendingModal: () => void }).consumePendingModal();
     },
@@ -296,6 +308,104 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     if (resolved) {
       host.execApprovalQueue = removeExecApproval(host.execApprovalQueue, resolved.id);
     }
+  }
+}
+
+async function loadServerSettings(app: OpenClawApp) {
+  if (!app.client) {
+    return;
+  }
+  try {
+    const { fetchServerSettings, pushServerSettings } =
+      await import("./controllers/settings-sync.ts");
+    const serverSettings = await fetchServerSettings(app.client);
+
+    if (serverSettings) {
+      // Apply server settings to app state
+      const prefs = serverSettings.preferences;
+      const nextSettings = {
+        ...app.settings,
+        theme: (prefs.theme as typeof app.settings.theme) ?? app.settings.theme,
+        developerMode: prefs.developerMode ?? app.settings.developerMode,
+        defaultSaveLocation: prefs.defaultSaveLocation ?? app.settings.defaultSaveLocation,
+        defaultVerifyMode:
+          (prefs.defaultVerifyMode as typeof app.settings.defaultVerifyMode) ??
+          app.settings.defaultVerifyMode,
+        chatFocusMode: prefs.chatFocusMode ?? app.settings.chatFocusMode,
+        chatShowThinking: prefs.chatShowThinking ?? app.settings.chatShowThinking,
+        splitRatio: prefs.splitRatio ?? app.settings.splitRatio,
+        navCollapsed: prefs.navCollapsed ?? app.settings.navCollapsed,
+        navGroupsCollapsed: prefs.navGroupsCollapsed ?? app.settings.navGroupsCollapsed,
+      };
+      app.applySettings(nextSettings);
+
+      if (serverSettings.storageConfig) {
+        app.storageConfig = serverSettings.storageConfig as Parameters<
+          typeof app.handleSaveStorageSetup
+        >[0];
+      }
+      if (serverSettings.studioProfile) {
+        app.studioProfile = serverSettings.studioProfile as typeof app.studioProfile;
+      }
+      if (serverSettings.folderTemplate) {
+        app.folderTemplate = serverSettings.folderTemplate as typeof app.folderTemplate;
+      }
+      if (serverSettings.recentProjects?.length) {
+        app.ingestRecentProjects = serverSettings.recentProjects as typeof app.ingestRecentProjects;
+      }
+      app.serverSettingsLoaded = true;
+    } else {
+      // First boot — migrate from localStorage if data exists
+      const { loadStorageConfig } = await import("./controllers/storage.ts");
+      const { loadStudioProfile } = await import("./controllers/studio-profile.ts");
+      const { loadFolderTemplate } = await import("./controllers/folder-template.ts");
+      const { loadRecentProjects } = await import("./controllers/ingest.ts");
+
+      const storageConfig = loadStorageConfig();
+      const studioProfile = loadStudioProfile();
+      const folderTemplate = loadFolderTemplate();
+      const recentProjects = loadRecentProjects();
+
+      const hasLocalData =
+        storageConfig !== null ||
+        studioProfile.completedSetup ||
+        folderTemplate !== null ||
+        recentProjects.length > 0;
+
+      if (hasLocalData && app.client) {
+        await pushServerSettings(app.client, {
+          preferences: {
+            theme: app.settings.theme,
+            developerMode: app.settings.developerMode,
+            defaultSaveLocation: app.settings.defaultSaveLocation,
+            defaultVerifyMode: app.settings.defaultVerifyMode,
+            chatFocusMode: app.settings.chatFocusMode,
+            chatShowThinking: app.settings.chatShowThinking,
+            splitRatio: app.settings.splitRatio,
+            navCollapsed: app.settings.navCollapsed,
+            navGroupsCollapsed: app.settings.navGroupsCollapsed,
+          },
+          storageConfig,
+          studioProfile: studioProfile.completedSetup ? studioProfile : null,
+          folderTemplate,
+          recentProjects,
+        });
+        // Clear migrated localStorage keys (keep connection-critical ones)
+        try {
+          localStorage.removeItem("cullmate.storage.config");
+          localStorage.removeItem("cullmate.studio-profile.v1");
+          localStorage.removeItem("cullmate.folder.template");
+          localStorage.removeItem("cullmate.ingest.recent");
+        } catch {
+          /* ignore */
+        }
+      }
+      app.serverSettingsLoaded = true;
+    }
+  } catch (err) {
+    console.error("[gateway] loadServerSettings error:", err);
+    // Fall through — app still works with localStorage fallback
+    app.serverSettingsLoaded = true;
   }
 }
 

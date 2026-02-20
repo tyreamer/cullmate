@@ -378,6 +378,7 @@ export function renderApp(state: AppViewState) {
           !isDev && (state.tab === "home" || state.tab === "projects" || state.tab === "settings")
             ? renderStudioManager({
                 connected: state.connected,
+                lastError: state.lastError,
                 timeline: state.studioTimeline,
                 formValues: state.studioFormValues,
                 importOptionsExpanded: state.importOptionsExpanded,
@@ -385,6 +386,7 @@ export function renderApp(state: AppViewState) {
                 onFormValueChange: (fieldId, value) =>
                   state.handleStudioFormValueChange(fieldId, value),
                 onFormSubmit: (fieldId, value) => state.handleStudioFormSubmit(fieldId, value),
+                onOpenSettings: () => (state.isSettingsSheetOpen = true),
               })
             : nothing
         }

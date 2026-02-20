@@ -21,6 +21,25 @@
   color: var(--muted);
 }
 
+.studio-manager__disconnected--error {
+  flex-direction: column;
+  gap: 12px;
+  text-align: center;
+}
+
+.studio-manager__error-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.studio-manager__error-detail {
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 400px;
+  line-height: 1.5;
+}
+
 .studio-manager__timeline {
   display: flex;
   flex-direction: column;
@@ -296,6 +315,240 @@
   background: var(--bg-hover);
 }
 
+/* ── Template picker grid ── */
+
+.studio-template-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.studio-template-option {
+  cursor: pointer;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  text-align: left;
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.studio-template-option:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-subtle);
+}
+
+.studio-template-option__name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-strong);
+}
+
+.studio-template-option__desc {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.studio-template-option__tree {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: pre;
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+/* ── Import card ── */
+
+.studio-import-card__source {
+  background: var(--secondary);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.studio-import-card__field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.studio-import-card__field .studio-card__input {
+  flex: 1;
+}
+
+.studio-import-card__field-label {
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.studio-import-card__field-value {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.studio-import-card__link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.studio-import-card__link-btn:hover {
+  text-decoration: underline;
+}
+
+.studio-import-card__options-toggle {
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.studio-import-card__options-toggle:hover {
+  color: var(--text);
+}
+
+.studio-import-card__options {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.studio-import-card__option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.studio-import-card__option-label {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.studio-import-card__option-value {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.studio-import-card__option-radios {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.studio-import-card__radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.studio-import-card__radio input[type="radio"] {
+  margin-top: 3px;
+}
+
+.studio-import-card__radio strong {
+  font-weight: 600;
+}
+
+.studio-import-card__radio-desc {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+.studio-import-card__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* ── Stage progress ── */
+
+.studio-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.studio-stage {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.studio-stage--active {
+  color: var(--text-strong);
+  font-weight: 500;
+}
+
+.studio-stage--done {
+  color: var(--ok);
+}
+
+.studio-stage__icon {
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.studio-stage--active .studio-stage__icon {
+  animation: pulse-subtle 1.5s ease-in-out infinite;
+}
+
+/* ── Result badges ── */
+
+.studio-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.studio-badge {
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.studio-badge--safe {
+  background: var(--ok-subtle);
+  color: var(--ok);
+}
+
+.studio-badge--unsafe {
+  background: var(--danger-subtle);
+  color: var(--danger);
+}
+
+.studio-badge--neutral {
+  background: var(--secondary);
+  color: var(--text);
+}
+
 /* ── Responsive ── */
 
 @media (max-width: 700px) {
@@ -315,5 +568,11 @@
   .studio-card__actions .btn {
     width: 100%;
     text-align: center;
+  }
+}
+
+@media (max-width: 500px) {
+  .studio-template-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -125,6 +125,8 @@ export const COPY = {
   showDetails: "Show details",
   hideDetails: "Hide details",
   disconnectedMessage: "Connecting to BaxBot\u2026",
+  connectionErrorTitle: "Can\u2019t connect to BaxBot",
+  openSettings: "Open Settings",
 
   // Diagnostics (Help section in Settings)
   diagnosticsTitle: "Help",
