@@ -210,6 +210,11 @@ export class OpenClawApp extends LitElement {
   @state() smartOrganizerStatusMessage: string | null = null;
   @state() smartOrganizerDevInfo: string | null = null;
 
+  // Model download state (Smart Folders auto-pull)
+  @state() modelDownloadStatus: "idle" | "downloading" | "ready" | "error" = "idle";
+  @state() modelDownloadPercent = 0;
+  @state() modelDownloadStatusLine: string | null = null;
+
   // Storage setup state
   @state() storageConfig: StorageConfig | null = loadStorageConfig();
   @state() isStorageSetupOpen = false;
@@ -1013,7 +1018,7 @@ export class OpenClawApp extends LitElement {
     updated[progressIndex] = {
       kind: "stage-progress" as const,
       id: "ingest-progress",
-      role: "cullmate" as const,
+      role: "baxbot" as const,
       projectName: this.ingestProjectName,
       stages: [
         { id: "copy", label: "Copying", status: copyStatus },
@@ -1118,18 +1123,89 @@ export class OpenClawApp extends LitElement {
   }
 
   handleTurnOnSmartOrganizer() {
-    if (this.settings.developerMode) {
-      // In dev mode, re-check status
-      this.smartOrganizerError = null;
-      void this.checkSmartOrganizerStatus().then(() => {
-        if (this.smartOrganizerStatus !== "ready") {
-          this.smartOrganizerError = "Smart Organizer is not running. Please try again.";
-        }
+    this.smartOrganizerError = null;
+    void this.checkSmartOrganizerStatus().then(async () => {
+      if (this.smartOrganizerStatus === "not_installed") {
+        // Ollama not running — show install message
+        const { COPY } = await import("./copy/studio-manager-copy.ts");
+        this.smartOrganizerError = COPY.modelInstallOllama;
+        return;
+      }
+      if (this.smartOrganizerStatus === "needs_model") {
+        // Ollama running but model missing — auto-download
+        void this.startModelDownload();
+        return;
+      }
+      if (this.smartOrganizerStatus !== "ready") {
+        this.smartOrganizerError =
+          "Smart folders isn\u2019t set up yet. Choose a preset layout instead.";
+      }
+    });
+  }
+
+  async startModelDownload() {
+    this.modelDownloadStatus = "downloading";
+    this.modelDownloadPercent = 0;
+    this.smartOrganizerStatus = "downloading";
+    this.smartOrganizerError = null;
+    const { COPY } = await import("./copy/studio-manager-copy.ts");
+    this.modelDownloadStatusLine = COPY.modelDownloading;
+
+    try {
+      const { createAIProvider } = await import("./controllers/ai-provider-factory.ts");
+      const provider = createAIProvider({
+        developerMode: this.settings.developerMode,
+        client: this.client,
       });
-    } else {
-      // Normal mode: coming soon
-      this.smartOrganizerError = "Coming soon.";
+      if (!provider.ensureModel) {
+        this.modelDownloadStatus = "error";
+        this.smartOrganizerError = COPY.modelDownloadFailed;
+        return;
+      }
+      const result = await provider.ensureModel();
+      if (!result.ok) {
+        this.modelDownloadStatus = "error";
+        this.smartOrganizerError = result.error ?? COPY.modelDownloadFailed;
+        this.smartOrganizerStatus = "needs_model";
+        return;
+      }
+      // Success — the final broadcast event will set status to ready
+      this.modelDownloadStatus = "ready";
+      this.modelDownloadStatusLine = COPY.modelDownloadReady;
+      this.smartOrganizerStatus = "ready";
+      // Re-check to populate cached models
+      void this.checkSmartOrganizerStatus();
+    } catch {
+      this.modelDownloadStatus = "error";
+      this.smartOrganizerError = COPY.modelDownloadFailed;
+      this.smartOrganizerStatus = "needs_model";
     }
+  }
+
+  handleModelDownloadUpdate(payload: {
+    type: string;
+    model_id?: string;
+    status?: string;
+    percent?: number;
+    completedMb?: number;
+    totalMb?: number;
+  }) {
+    if (payload.status === "ready") {
+      this.modelDownloadStatus = "ready";
+      this.modelDownloadPercent = 100;
+      void import("./copy/studio-manager-copy.ts").then(({ COPY }) => {
+        this.modelDownloadStatusLine = COPY.modelDownloadReady;
+      });
+      return;
+    }
+    this.modelDownloadStatus = "downloading";
+    this.modelDownloadPercent = payload.percent ?? 0;
+    void import("./copy/studio-manager-copy.ts").then(({ COPY }) => {
+      this.modelDownloadStatusLine = COPY.modelDownloadProgress(
+        payload.completedMb ?? 0,
+        payload.totalMb ?? 0,
+      );
+    });
   }
 
   // Storage setup handlers
@@ -1484,13 +1560,13 @@ export class OpenClawApp extends LitElement {
       {
         kind: "text" as const,
         id: "ingest-started",
-        role: "cullmate" as const,
+        role: "baxbot" as const,
         body: `Saving photos from ${source.label || sourcePath.split("/").pop() || sourcePath}\u2026`,
       },
       {
         kind: "stage-progress" as const,
         id: "ingest-progress",
-        role: "cullmate" as const,
+        role: "baxbot" as const,
         projectName,
         stages: [
           { id: "copy", label: COPY.stageCopying, status: "active" as const },
@@ -1565,7 +1641,7 @@ export class OpenClawApp extends LitElement {
       }> = [];
       if (safeToFormat !== null) {
         badges.push({
-          label: safeToFormat ? "Safe to format: YES" : "Safe to format: NO",
+          label: safeToFormat ? "Ready to eject" : "Don\u2019t eject yet",
           variant: safeToFormat ? "safe" : "unsafe",
         });
       }
@@ -1585,13 +1661,13 @@ export class OpenClawApp extends LitElement {
         {
           kind: "text" as const,
           id: "ingest-done-summary",
-          role: "cullmate" as const,
+          role: "baxbot" as const,
           body: summaryBody,
         },
         {
           kind: "result" as const,
           id: "ingest-result",
-          role: "cullmate" as const,
+          role: "baxbot" as const,
           safeToFormat,
           headline: COPY.completionHeadline,
           verdict: safeToFormat ? COPY.safeToFormatYes : COPY.safeToFormatNotYet,
@@ -1635,13 +1711,13 @@ export class OpenClawApp extends LitElement {
         {
           kind: "text" as const,
           id: "ingest-error",
-          role: "cullmate" as const,
+          role: "baxbot" as const,
           body: `Something went wrong: ${this.ingestError}`,
         },
         {
           kind: "action" as const,
           id: "import-retry",
-          role: "cullmate" as const,
+          role: "baxbot" as const,
           title: "Try again?",
           primaryButton: { label: COPY.savePhotosSafely, action: "import-detected" },
         },
@@ -1682,13 +1758,13 @@ export class OpenClawApp extends LitElement {
       {
         kind: "text" as const,
         id: "ingest-started",
-        role: "cullmate" as const,
+        role: "baxbot" as const,
         body: `Saving photos from ${source.label || sourcePath.split("/").pop() || sourcePath}\u2026`,
       },
       {
         kind: "stage-progress" as const,
         id: "ingest-progress",
-        role: "cullmate" as const,
+        role: "baxbot" as const,
         projectName: trimmedName,
         stages: [
           { id: "copy", label: COPY.stageCopying, status: "active" as const },
@@ -1763,7 +1839,7 @@ export class OpenClawApp extends LitElement {
       }> = [];
       if (safeToFormat !== null) {
         badges.push({
-          label: safeToFormat ? "Safe to format: YES" : "Safe to format: NO",
+          label: safeToFormat ? "Ready to eject" : "Don\u2019t eject yet",
           variant: safeToFormat ? "safe" : "unsafe",
         });
       }
@@ -1783,13 +1859,13 @@ export class OpenClawApp extends LitElement {
         {
           kind: "text" as const,
           id: "ingest-done-summary",
-          role: "cullmate" as const,
+          role: "baxbot" as const,
           body: summaryBody2,
         },
         {
           kind: "result" as const,
           id: "ingest-result",
-          role: "cullmate" as const,
+          role: "baxbot" as const,
           safeToFormat,
           headline: COPY.completionHeadline,
           verdict: safeToFormat ? COPY.safeToFormatYes : COPY.safeToFormatNotYet,
@@ -1833,13 +1909,13 @@ export class OpenClawApp extends LitElement {
         {
           kind: "text" as const,
           id: "ingest-error",
-          role: "cullmate" as const,
+          role: "baxbot" as const,
           body: `Something went wrong: ${this.ingestError}`,
         },
         {
           kind: "action" as const,
           id: "import-retry",
-          role: "cullmate" as const,
+          role: "baxbot" as const,
           title: "Try again?",
           primaryButton: { label: COPY.savePhotosSafely, action: "import-detected" },
         },

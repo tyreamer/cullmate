@@ -13,6 +13,10 @@ export type FolderTemplatePickerState = {
   smartOrganizerGenerating: boolean;
   smartOrganizerError: string | null;
   smartOrganizerStatusMessage: string | null;
+  // Model download progress
+  modelDownloadStatus: "idle" | "downloading" | "ready" | "error";
+  modelDownloadPercent: number;
+  modelDownloadStatusLine: string | null;
   // Dev-only details
   developerMode: boolean;
   devProviderInfo: string | null;
@@ -28,6 +32,8 @@ export type FolderTemplatePickerState = {
 export function renderFolderTemplatePicker(state: FolderTemplatePickerState) {
   const selected = state.customTemplate ?? state.selectedTemplate;
   const isReady = state.smartOrganizerStatus === "ready";
+  const isDownloading =
+    state.smartOrganizerStatus === "downloading" || state.modelDownloadStatus === "downloading";
 
   return html`
     <div style="max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px;">
@@ -76,28 +82,30 @@ export function renderFolderTemplatePicker(state: FolderTemplatePickerState) {
           placeholder="RAW in 01 RAW by camera, videos in VIDEO, exports in DELIVERY."
           .value=${state.smartOrganizerPrompt}
           @input=${(e: InputEvent) => state.onPromptChange((e.target as HTMLTextAreaElement).value)}
-          ?disabled=${!isReady && state.smartOrganizerStatus !== "not_installed"}
+          ?disabled=${isDownloading || (!isReady && state.smartOrganizerStatus !== "not_installed" && state.smartOrganizerStatus !== "needs_model")}
           rows="2"
           style="flex: 1; background: var(--secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; color: var(--text); font-size: 0.82rem; resize: vertical; font-family: inherit;"
         ></textarea>
         <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
           ${
-            isReady
-              ? html`
-                <button
-                  class="btn btn--sm primary"
-                  ?disabled=${!state.smartOrganizerPrompt.trim() || state.smartOrganizerGenerating}
-                  @click=${state.onGenerate}
-                  style="padding: 6px 14px; font-size: 0.82rem;"
-                >${state.smartOrganizerGenerating ? "Creating\u2026" : "Create layout"}</button>
-              `
-              : html`
-                <button
-                  class="btn btn--sm"
-                  @click=${state.onTurnOnSmartOrganizer}
-                  style="padding: 6px 14px; font-size: 0.82rem;"
-                >Turn on Smart Organizer</button>
-              `
+            isDownloading
+              ? renderDownloadProgress(state)
+              : isReady
+                ? html`
+                  <button
+                    class="btn btn--sm primary"
+                    ?disabled=${!state.smartOrganizerPrompt.trim() || state.smartOrganizerGenerating}
+                    @click=${state.onGenerate}
+                    style="padding: 6px 14px; font-size: 0.82rem;"
+                  >${state.smartOrganizerGenerating ? "Creating\u2026" : "Create layout"}</button>
+                `
+                : html`
+                  <button
+                    class="btn btn--sm"
+                    @click=${state.onTurnOnSmartOrganizer}
+                    style="padding: 6px 14px; font-size: 0.82rem;"
+                  >Set up smart folders</button>
+                `
           }
           ${
             state.smartOrganizerError
@@ -147,6 +155,31 @@ export function renderFolderTemplatePicker(state: FolderTemplatePickerState) {
           @click=${() => selected && state.onSave(selected)}
           style="padding: 8px 16px;"
         >Save</button>
+      </div>
+    </div>
+  `;
+}
+
+/** Download progress bar for model pull. */
+function renderDownloadProgress(state: FolderTemplatePickerState) {
+  return html`
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 200px;">
+      <div style="font-size: 0.78rem; color: var(--muted);">
+        ${state.modelDownloadStatusLine ?? "Downloading\u2026"}
+      </div>
+      <div style="
+        height: 6px;
+        background: var(--border);
+        border-radius: 3px;
+        overflow: hidden;
+      ">
+        <div style="
+          height: 100%;
+          width: ${state.modelDownloadPercent}%;
+          background: var(--accent);
+          border-radius: 3px;
+          transition: width 0.3s ease;
+        "></div>
       </div>
     </div>
   `;

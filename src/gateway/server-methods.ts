@@ -14,6 +14,7 @@ import { healthHandlers } from "./server-methods/health.js";
 import { logsHandlers } from "./server-methods/logs.js";
 import { modelsHandlers } from "./server-methods/models.js";
 import { nodeHandlers } from "./server-methods/nodes.js";
+import { ollamaEnsureModelHandlers } from "./server-methods/ollama-ensure-model.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
 import { skillsHandlers } from "./server-methods/skills.js";
@@ -100,6 +101,7 @@ const WRITE_METHODS = new Set([
   "chat.abort",
   "browser.request",
   "photo.generate_template",
+  "ollama.ensure_model",
 ]);
 
 function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["client"]) {
@@ -201,6 +203,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...agentsHandlers,
   ...browserHandlers,
   ...templateGenerateHandlers,
+  ...ollamaEnsureModelHandlers,
   ...toolsInvokeHandlers,
 };
 

@@ -55,7 +55,7 @@ struct MenuContent: View {
                     await self.openDashboardWithModal(modal: "ingest")
                 }
             } label: {
-                Label("Ingest & Verify\u{2026}", systemImage: "sdcard")
+                Label("Import & Verify\u{2026}", systemImage: "sdcard")
             }
             Button {
                 Task { @MainActor in
@@ -138,15 +138,15 @@ struct MenuContent: View {
     private var gatewayStatusLabel: String {
         switch self.gatewayManager.status {
         case .stopped:
-            return "Gateway stopped"
+            return "BaxBot stopped"
         case .starting:
-            return "Gateway starting\u{2026}"
+            return "BaxBot starting\u{2026}"
         case .running:
-            return "Gateway running"
+            return "BaxBot running"
         case .attachedExisting:
-            return "Gateway running"
+            return "BaxBot running"
         case let .failed(reason):
-            return "Gateway failed: \(reason)"
+            return "BaxBot failed: \(reason)"
         }
     }
 

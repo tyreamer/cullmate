@@ -29,8 +29,8 @@ struct GeneralSettings: View {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 12) {
                     SettingsToggleRow(
-                        title: "OpenClaw active",
-                        subtitle: "Pause to stop the OpenClaw gateway; no messages will be processed.",
+                        title: "BaxBot active",
+                        subtitle: "Pause to stop the BaxBot gateway; no messages will be processed.",
                         binding: self.activeBinding)
 
                     self.connectionSection
@@ -39,12 +39,12 @@ struct GeneralSettings: View {
 
                     SettingsToggleRow(
                         title: "Launch at login",
-                        subtitle: "Automatically start OpenClaw after you sign in.",
+                        subtitle: "Automatically start BaxBot after you sign in.",
                         binding: self.$state.launchAtLogin)
 
                     SettingsToggleRow(
                         title: "Show Dock icon",
-                        subtitle: "Keep OpenClaw visible in the Dock instead of menu-bar-only mode.",
+                        subtitle: "Keep BaxBot visible in the Dock instead of menu-bar-only mode.",
                         binding: self.$state.showDockIcon)
 
                     SettingsToggleRow(
@@ -76,7 +76,7 @@ struct GeneralSettings: View {
                 Spacer(minLength: 12)
                 HStack {
                     Spacer()
-                    Button("Quit OpenClaw") { NSApp.terminate(nil) }
+                    Button("Quit BaxBot") { NSApp.terminate(nil) }
                         .buttonStyle(.borderedProminent)
                 }
             }
@@ -103,7 +103,7 @@ struct GeneralSettings: View {
 
     private var connectionSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("OpenClaw runs")
+            Text("BaxBot runs")
                 .font(.title3.weight(.semibold))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -664,7 +664,7 @@ extension GeneralSettings {
         let alert = NSAlert()
         alert.messageText = "Log file not found"
         alert.informativeText = """
-        Looked for openclaw logs in /tmp/openclaw/.
+        Looked for BaxBot logs in /tmp/openclaw/.
         Run a health check or send a message to generate activity, then try again.
         """
         alert.alertStyle = .informational
@@ -737,11 +737,11 @@ extension GeneralSettings {
 
         state.connectionMode = .local
         view.gatewayStatus = GatewayEnvironmentStatus(
-            kind: .error("Gateway offline"),
+            kind: .error("BaxBot offline"),
             nodeVersion: nil,
             gatewayVersion: nil,
             requiredGateway: nil,
-            message: "Gateway offline")
+            message: "BaxBot offline")
         _ = view.body
     }
 }

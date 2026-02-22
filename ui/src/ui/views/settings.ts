@@ -22,6 +22,9 @@ export type SettingsViewState = {
   diagnosticsExporting: boolean;
   onToggleAiFeatures: (enabled: boolean) => void;
   onRunAiSetup: () => void;
+  modelDownloadStatus?: "idle" | "downloading" | "ready" | "error";
+  modelDownloadPercent?: number;
+  modelDownloadStatusLine?: string | null;
 };
 
 export function renderSettingsView(state: SettingsViewState) {
@@ -134,7 +137,7 @@ export function renderSettingsView(state: SettingsViewState) {
       </section>
 
       <section>
-        <h3 style="font-size: 0.9rem; margin: 0 0 8px;">Import speed</h3>
+        <h3 style="font-size: 0.9rem; margin: 0 0 8px;">How carefully to check files</h3>
         <div style="display: flex; gap: 6px;">
           <button
             class="btn btn--sm ${state.settings.defaultVerifyMode === "none" ? "primary" : ""}"
@@ -142,7 +145,7 @@ export function renderSettingsView(state: SettingsViewState) {
             @click=${() => state.onSettingsChange({ ...state.settings, defaultVerifyMode: "none" })}
           >
             <div style="font-weight: 600;">Fast</div>
-            <div style="font-size: 0.7rem; color: ${state.settings.defaultVerifyMode === "none" ? "inherit" : "var(--muted)"};">Hash during copy, skip verification</div>
+            <div style="font-size: 0.7rem; color: ${state.settings.defaultVerifyMode === "none" ? "inherit" : "var(--muted)"};">Checks during copy only</div>
           </button>
           <button
             class="btn btn--sm ${state.settings.defaultVerifyMode === "sentinel" ? "primary" : ""}"
@@ -151,7 +154,7 @@ export function renderSettingsView(state: SettingsViewState) {
               state.onSettingsChange({ ...state.settings, defaultVerifyMode: "sentinel" })}
           >
             <div style="font-weight: 600;">Careful</div>
-            <div style="font-size: 0.7rem; color: ${state.settings.defaultVerifyMode === "sentinel" ? "inherit" : "var(--muted)"};">Hash + verify a sample after copy</div>
+            <div style="font-size: 0.7rem; color: ${state.settings.defaultVerifyMode === "sentinel" ? "inherit" : "var(--muted)"};">Double-checks a sample after copy</div>
           </button>
         </div>
       </section>
@@ -196,8 +199,8 @@ export function renderSettingsView(state: SettingsViewState) {
         <details style="margin-top: 10px;">
           <summary style="font-size: 0.75rem; color: var(--muted); cursor: pointer;">What does this do?</summary>
           <p style="font-size: 0.75rem; color: var(--muted); margin: 6px 0 0;">
-            BaxBot saves this info in a small helper file next to each photo so apps like Lightroom
-            can read it. Your original photos are never changed.
+            BaxBot saves a small info file next to each photo so apps like Lightroom
+            can read your copyright. Your original photos are never changed.
           </p>
         </details>
       </section>
@@ -241,22 +244,48 @@ export function renderSettingsView(state: SettingsViewState) {
       </section>
 
       <section>
-        <h3 style="font-size: 0.9rem; margin: 0 0 8px;">AI Features (Optional)</h3>
+        <h3 style="font-size: 0.9rem; margin: 0 0 8px;">Smart Folders (Optional)</h3>
         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 8px;">
           <input
             type="checkbox"
             .checked=${state.settings.aiFeaturesEnabled}
             @change=${(e: Event) => state.onToggleAiFeatures((e.target as HTMLInputElement).checked)}
           />
-          <span style="font-size: 0.85rem;">Enable local AI helpers</span>
+          <span style="font-size: 0.85rem;">Organize folders automatically</span>
         </label>
-        <button
-          class="btn btn--sm"
-          @click=${state.onRunAiSetup}
-          style="padding: 6px 12px; font-size: 0.78rem;"
-        >Run AI setup</button>
+        ${
+          state.modelDownloadStatus === "downloading"
+            ? html`
+              <div style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px;">
+                <div style="font-size: 0.78rem; color: var(--muted);">
+                  ${state.modelDownloadStatusLine ?? "Downloading\u2026"}
+                </div>
+                <div style="
+                  height: 6px;
+                  background: var(--border);
+                  border-radius: 3px;
+                  overflow: hidden;
+                ">
+                  <div style="
+                    height: 100%;
+                    width: ${state.modelDownloadPercent ?? 0}%;
+                    background: var(--accent);
+                    border-radius: 3px;
+                    transition: width 0.3s ease;
+                  "></div>
+                </div>
+              </div>
+            `
+            : html`
+              <button
+                class="btn btn--sm"
+                @click=${state.onRunAiSetup}
+                style="padding: 6px 12px; font-size: 0.78rem;"
+              >Set up smart folders</button>
+            `
+        }
         <p style="font-size: 0.72rem; color: var(--muted); margin: 6px 0 0;">
-          Core import/backup features work without AI. You can enable AI now or later.
+          Runs on your computer, no internet needed. Import and backup work fine without this.
         </p>
       </section>
 

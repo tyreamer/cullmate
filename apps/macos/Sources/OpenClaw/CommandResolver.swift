@@ -47,6 +47,13 @@ enum CommandResolver {
     }
 
     static func projectRoot() -> URL {
+        // Check inside the app bundle first (zero-friction self-contained .app).
+        if let bundleGateway = Bundle.main.resourceURL?.appendingPathComponent("gateway"),
+           FileManager().fileExists(atPath: bundleGateway.appendingPathComponent("dist/index.js").path)
+        {
+            return bundleGateway
+        }
+
         if let stored = UserDefaults.standard.string(forKey: self.projectRootDefaultsKey),
            let url = self.expandPath(stored),
            FileManager().fileExists(atPath: url.path)

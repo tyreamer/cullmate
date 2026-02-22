@@ -194,7 +194,9 @@
 
 .home-source-card:hover {
   border-color: var(--accent);
-  box-shadow: var(--shadow-md), 0 0 20px var(--accent-glow);
+  box-shadow:
+    var(--shadow-md),
+    0 0 20px var(--accent-glow);
   transform: translateY(-2px);
 }
 

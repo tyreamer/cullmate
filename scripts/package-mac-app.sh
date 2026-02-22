@@ -252,6 +252,26 @@ else
   fi
 fi
 
+echo "📦 Embedding gateway runtime (zero-friction self-contained app)"
+GATEWAY_DEST="$APP_ROOT/Contents/Resources/gateway"
+mkdir -p "$GATEWAY_DEST"
+# Copy the bundled JS gateway (tsdown output), excluding the .app bundle itself
+if [ -d "$ROOT_DIR/dist" ]; then
+  rsync -a --exclude='OpenClaw.app' "$ROOT_DIR/dist/" "$GATEWAY_DEST/dist/"
+  echo "    → dist/ copied ($(du -sh "$GATEWAY_DEST/dist" | cut -f1))"
+else
+  echo "ERROR: dist/ directory not found — run pnpm build first" >&2
+  exit 1
+fi
+# Copy default config (baxbot-defaults.json)
+if [ -d "$ROOT_DIR/config" ]; then
+  cp -R "$ROOT_DIR/config" "$GATEWAY_DEST/config"
+fi
+# Copy package.json for version info
+if [ -f "$ROOT_DIR/package.json" ]; then
+  cp "$ROOT_DIR/package.json" "$GATEWAY_DEST/package.json"
+fi
+
 echo "⏹  Stopping any running OpenClaw"
 killall -q OpenClaw 2>/dev/null || true
 

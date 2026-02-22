@@ -28,7 +28,7 @@ export type StudioManagerViewState = {
 // ── Sub-renderers ──
 
 function renderTextBubble(msg: TextMessage) {
-  const align = msg.role === "cullmate" ? "cullmate" : "you";
+  const align = msg.role === "baxbot" ? "baxbot" : "you";
   return html`
     <div class="studio-msg studio-msg--${align}">
       <div class="studio-bubble studio-bubble--${align}">

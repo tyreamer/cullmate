@@ -109,7 +109,7 @@ final class VolumeWatcher {
     private func registerNotificationCategory() {
         let ingestAction = UNNotificationAction(
             identifier: Self.actionIdentifier,
-            title: "Ingest & Verify",
+            title: "Import & Verify",
             options: [.foreground]
         )
         let category = UNNotificationCategory(
@@ -138,7 +138,7 @@ final class VolumeWatcher {
 
         let content = UNMutableNotificationContent()
         content.title = "Camera card detected"
-        content.body = "\(volumeName) — Ingest & Verify?"
+        content.body = "\(volumeName) — Import & Verify?"
         content.categoryIdentifier = Self.notificationCategory
         content.userInfo = ["sourcePath": sourcePath]
         content.sound = .default

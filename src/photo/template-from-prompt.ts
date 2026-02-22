@@ -3,7 +3,8 @@ import type { FolderTemplate } from "./folder-template.js";
 import { ALLOWED_TOKENS } from "./template-expand.js";
 import { validateFolderTemplate } from "./template-validate.js";
 
-const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
+export const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
+export const SMART_FOLDERS_MODEL = "llama3.2:3b";
 const TIMEOUT_MS = 30_000;
 const MAX_RETRIES = 1;
 

@@ -5,7 +5,7 @@ import { formatPathLabel } from "./storage.ts";
 
 // ── Timeline entry types (discriminated union on `kind`) ──
 
-export type StudioMessageRole = "cullmate" | "you";
+export type StudioMessageRole = "baxbot" | "you";
 
 export type TextMessage = {
   kind: "text";
@@ -17,7 +17,7 @@ export type TextMessage = {
 export type ActionCard = {
   kind: "action";
   id: string;
-  role: "cullmate";
+  role: "baxbot";
   title: string;
   description?: string;
   primaryButton: { label: string; action: string };
@@ -30,7 +30,7 @@ export type ActionCard = {
 export type StatusCard = {
   kind: "status";
   id: string;
-  role: "cullmate";
+  role: "baxbot";
   statusLine: string;
   progressPercent: number;
   counters?: Array<{ label: string; value: string }>;
@@ -39,7 +39,7 @@ export type StatusCard = {
 export type ResultCard = {
   kind: "result";
   id: string;
-  role: "cullmate";
+  role: "baxbot";
   safeToFormat: boolean | null;
   headline: string;
   verdict?: string;
@@ -61,7 +61,7 @@ export type ResultCard = {
 export type FormCard = {
   kind: "form";
   id: string;
-  role: "cullmate";
+  role: "baxbot";
   title: string;
   fieldId: string;
   placeholder?: string;
@@ -73,14 +73,14 @@ export type FormCard = {
 export type TemplatePickerCard = {
   kind: "template-picker";
   id: string;
-  role: "cullmate";
+  role: "baxbot";
   presets: FolderTemplate[];
 };
 
 export type ImportCard = {
   kind: "import";
   id: string;
-  role: "cullmate";
+  role: "baxbot";
   source: { label: string; path: string } | null;
   projectName: string;
   saveTo: string;
@@ -94,7 +94,7 @@ export type ImportCard = {
 export type StageProgressCard = {
   kind: "stage-progress";
   id: string;
-  role: "cullmate";
+  role: "baxbot";
   projectName: string;
   stages: Array<{ id: string; label: string; status: "pending" | "active" | "done" }>;
   currentStageProgress: number;
@@ -145,13 +145,13 @@ export function buildStarterTimeline(opts: {
       {
         kind: "text",
         id: "welcome",
-        role: "cullmate",
+        role: "baxbot",
         body: COPY.welcomeGreeting,
       },
       {
         kind: "action",
         id: "setup-storage",
-        role: "cullmate",
+        role: "baxbot",
         title: COPY.storageTitle,
         primaryButton: { label: COPY.storageButton, action: "open-storage-setup" },
       },
@@ -164,19 +164,19 @@ export function buildStarterTimeline(opts: {
       {
         kind: "text",
         id: "storage-done",
-        role: "cullmate",
+        role: "baxbot",
         body: COPY.storageDone,
       },
       {
         kind: "text",
         id: "layout-prompt",
-        role: "cullmate",
+        role: "baxbot",
         body: COPY.layoutPrompt,
       },
       {
         kind: "template-picker",
         id: "setup-layout",
-        role: "cullmate",
+        role: "baxbot",
         presets: presets ?? [],
       },
     ];
@@ -188,13 +188,13 @@ export function buildStarterTimeline(opts: {
       {
         kind: "text",
         id: "profile-prompt",
-        role: "cullmate",
+        role: "baxbot",
         body: COPY.profilePromptInline,
       },
       {
         kind: "action",
         id: "setup-profile",
-        role: "cullmate",
+        role: "baxbot",
         title: COPY.profileTitleInline,
         description: COPY.profileDescription,
         primaryButton: { label: COPY.profileTurnOn, action: "open-profile-setup" },
@@ -209,13 +209,13 @@ export function buildStarterTimeline(opts: {
       {
         kind: "text",
         id: "ai-prompt",
-        role: "cullmate",
+        role: "baxbot",
         body: COPY.aiPromptInline,
       },
       {
         kind: "action",
         id: "setup-ai",
-        role: "cullmate",
+        role: "baxbot",
         title: COPY.aiTitleInline,
         description: COPY.aiDescription,
         primaryButton: { label: COPY.aiSetupNow, action: "open-ai-setup" },
@@ -232,13 +232,13 @@ export function buildStarterTimeline(opts: {
       {
         kind: "text",
         id: "detected-source",
-        role: "cullmate",
+        role: "baxbot",
         body: COPY.detectedSourceBody(label),
       },
       {
         kind: "action",
         id: "import-detected",
-        role: "cullmate",
+        role: "baxbot",
         title: COPY.savePhotosSafely,
         primaryButton: { label: COPY.savePhotosSafely, action: "import-detected" },
         secondaryButtons: [{ label: COPY.notNow, action: "dismiss-detected" }],
@@ -249,7 +249,7 @@ export function buildStarterTimeline(opts: {
       entries.push({
         kind: "action",
         id: "recent-projects",
-        role: "cullmate",
+        role: "baxbot",
         title: COPY.recentTitle,
         description: COPY.recentDescription,
         primaryButton: { label: COPY.recentTitle, action: "view-projects" },
@@ -268,13 +268,13 @@ export function buildStarterTimeline(opts: {
     {
       kind: "text",
       id: "ready",
-      role: "cullmate",
+      role: "baxbot",
       body: COPY.readyWhenYouAre,
     },
     {
       kind: "action",
       id: "import-open",
-      role: "cullmate",
+      role: "baxbot",
       title: COPY.savePhotosSafely,
       primaryButton: { label: COPY.savePhotosSafely, action: "open-import" },
     },
@@ -284,7 +284,7 @@ export function buildStarterTimeline(opts: {
     entries.push({
       kind: "action",
       id: "recent-projects",
-      role: "cullmate",
+      role: "baxbot",
       title: COPY.recentTitle,
       description: COPY.recentDescription,
       primaryButton: { label: COPY.recentTitle, action: "view-projects" },
@@ -311,13 +311,13 @@ export function buildNamingTimeline(opts: {
     {
       kind: "text",
       id: "naming-prompt",
-      role: "cullmate",
+      role: "baxbot",
       body: COPY.namingPrompt,
     },
     {
       kind: "form",
       id: "project-name-form",
-      role: "cullmate",
+      role: "baxbot",
       title: COPY.namingTitle,
       fieldId: "project-name",
       placeholder: COPY.namingPlaceholder,
@@ -350,14 +350,14 @@ export function buildImportTimeline(opts: {
     entries.push({
       kind: "text",
       id: "import-intro",
-      role: "cullmate",
+      role: "baxbot",
       body: COPY.detectedSourceBody(opts.source.label),
     });
   }
   entries.push({
     kind: "import",
     id: "import-card",
-    role: "cullmate",
+    role: "baxbot",
     source: opts.source,
     projectName: opts.projectName,
     saveTo: opts.saveTo,

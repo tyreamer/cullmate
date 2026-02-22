@@ -329,7 +329,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         let userInfo = response.notification.request.content.userInfo
         let category = response.notification.request.content.categoryIdentifier
 
-        if category == VolumeWatcher.notificationCategory {
+        if category == "CULLMATE_CAMERA_CARD" {
             if let sourcePath = userInfo["sourcePath"] as? String {
                 Task { @MainActor in
                     VolumeWatcher.shared.handleNotificationAction(sourcePath: sourcePath)

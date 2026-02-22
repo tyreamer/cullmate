@@ -417,9 +417,11 @@ function renderSafeToFormatBanner(result: IngestResult | null) {
       >
         <span style="font-size: 1.5rem; color: var(--ok)">&#x2713;</span>
         <div>
-          <div style="font-weight: 700; font-size: 0.95rem; color: var(--ok)">Safe to Format Cards</div>
+          <div style="font-weight: 700; font-size: 0.95rem; color: var(--ok)">
+            You can eject your card
+          </div>
           <div style="font-size: 0.78rem; color: var(--muted)">
-            All files copied to both destinations. All verifications passed.
+            Every photo was copied and double-checked. Your backup is ready too.
           </div>
         </div>
       </div>
@@ -432,7 +434,7 @@ function renderSafeToFormatBanner(result: IngestResult | null) {
       <div style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: var(--radius-sm); margin-bottom: 12px; background: rgba(198, 40, 40, 0.1); border: 2px solid var(--danger);">
         <span style="font-size: 1.5rem; color: var(--danger);">&#x2717;</span>
         <div>
-          <div style="font-weight: 700; font-size: 0.95rem; color: var(--danger);">Do NOT Format Cards</div>
+          <div style="font-weight: 700; font-size: 0.95rem; color: var(--danger);">Don\u2019t eject yet</div>
           <div style="font-size: 0.78rem; color: var(--muted);">${hasBackup ? "Some files failed to copy or verify. Check the Safety Report for details." : "No backup configured. Set up backup in Settings first."}</div>
         </div>
       </div>`;

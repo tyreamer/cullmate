@@ -338,7 +338,7 @@ describe("buildStatusMessage", () => {
   }) {
     const logPath = path.join(
       params.dir,
-      ".baxbot",
+      ".openclaw",
       "agents",
       params.agentId,
       "sessions",

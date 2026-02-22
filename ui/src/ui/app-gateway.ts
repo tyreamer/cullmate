@@ -246,6 +246,22 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
         ).handleIngestToolUpdate(toolPayload);
       }
     }
+    // Handle model_download broadcast events for Smart Folders
+    if (chatPayloadAny?.type === "model_download") {
+      const downloadPayload = chatPayloadAny as {
+        type: string;
+        model_id?: string;
+        status?: string;
+        percent?: number;
+        completedMb?: number;
+        totalMb?: number;
+      };
+      (
+        host as unknown as {
+          handleModelDownloadUpdate: (p: typeof downloadPayload) => void;
+        }
+      ).handleModelDownloadUpdate(downloadPayload);
+    }
     if (payload?.sessionKey) {
       setLastActiveSessionKey(
         host as unknown as Parameters<typeof setLastActiveSessionKey>[0],

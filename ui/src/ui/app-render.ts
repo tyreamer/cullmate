@@ -153,6 +153,9 @@ export function renderApp(state: AppViewState) {
       smartOrganizerGenerating: state.smartOrganizerGenerating,
       smartOrganizerError: state.smartOrganizerError,
       smartOrganizerStatusMessage: state.smartOrganizerStatusMessage,
+      modelDownloadStatus: state.modelDownloadStatus,
+      modelDownloadPercent: state.modelDownloadPercent,
+      modelDownloadStatusLine: state.modelDownloadStatusLine,
       developerMode: state.settings.developerMode,
       devProviderInfo: state.smartOrganizerDevInfo,
       onSelectPreset: (t) => state.handleSelectFolderTemplatePreset(t),
@@ -473,8 +476,11 @@ export function renderApp(state: AppViewState) {
                     aiFeaturesEnabled: true,
                     aiOnboardingDone: true,
                   });
-                  void state.checkSmartOrganizerStatus();
+                  state.handleTurnOnSmartOrganizer();
                 },
+                modelDownloadStatus: state.modelDownloadStatus,
+                modelDownloadPercent: state.modelDownloadPercent,
+                modelDownloadStatusLine: state.modelDownloadStatusLine,
                 onPickFolder: async () => {
                   if (!state.client) {
                     return;
@@ -1336,8 +1342,11 @@ export function renderApp(state: AppViewState) {
                         aiFeaturesEnabled: true,
                         aiOnboardingDone: true,
                       });
-                      void state.checkSmartOrganizerStatus();
+                      state.handleTurnOnSmartOrganizer();
                     },
+                    modelDownloadStatus: state.modelDownloadStatus,
+                    modelDownloadPercent: state.modelDownloadPercent,
+                    modelDownloadStatusLine: state.modelDownloadStatusLine,
                     onPickFolder: async () => {
                       if (!state.client) {
                         return;

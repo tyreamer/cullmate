@@ -107,6 +107,10 @@ export type AppViewState = {
   smartOrganizerError: string | null;
   smartOrganizerStatusMessage: string | null;
   smartOrganizerDevInfo: string | null;
+  // Model download state (Smart Folders auto-pull)
+  modelDownloadStatus: "idle" | "downloading" | "ready" | "error";
+  modelDownloadPercent: number;
+  modelDownloadStatusLine: string | null;
   // Studio Manager timeline
   studioTimeline: TimelineEntry[];
   studioFormValues: Record<string, string>;

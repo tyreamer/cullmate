@@ -29,7 +29,7 @@ struct AboutSettings: View {
             }
 
             VStack(spacing: 3) {
-                Text("OpenClaw")
+                Text("BaxBot")
                     .font(.title3.bold())
                 Text("Version \(self.versionString)")
                     .foregroundStyle(.secondary)
@@ -38,7 +38,7 @@ struct AboutSettings: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-                Text("Menu bar companion for notifications, screenshots, and privileged agent actions.")
+                Text("Your Studio Manager — handles everything around the edit.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

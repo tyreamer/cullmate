@@ -303,7 +303,7 @@ struct CronJobEditor: View {
             Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 14, verticalSpacing: 10) {
                 GridRow {
                     self.gridLabel("Message")
-                    TextField("What should OpenClaw do?", text: self.$agentMessage, axis: .vertical)
+                    TextField("What should BaxBot do?", text: self.$agentMessage, axis: .vertical)
                         .textFieldStyle(.roundedBorder)
                         .lineLimit(3...7)
                         .frame(maxWidth: .infinity)

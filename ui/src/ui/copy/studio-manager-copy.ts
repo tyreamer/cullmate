@@ -13,8 +13,8 @@ export const COPY = {
 
   // Studio Profile onboarding
   profilePrompt:
-    "Want copyright info added to your files? It's invisible metadata \u2014 only editing apps see it.",
-  profileTitle: "Copyright metadata",
+    "Want copyright info added to your files? It\u2019s invisible \u2014 only editing apps see it.",
+  profileTitle: "Copyright info",
   profileButton: "Set it up",
   profileSkip: "Not now",
   profileDone: "Profile saved.",
@@ -34,11 +34,11 @@ export const COPY = {
   statusDone: "All done!",
 
   // Result card
-  safeToFormatYes: "Safe to format cards",
-  safeToFormatNotYet: "Not yet safe to format",
+  safeToFormatYes: "You can eject your card",
+  safeToFormatNotYet: "Don\u2019t eject yet",
   safeToFormatYesDetail: "Every photo was copied and double-checked. Your backup is ready too.",
   safeToFormatNoDetail:
-    "Something went wrong during the copy. Check the Safety Report for details.",
+    "Something went wrong during the copy. Check the Safety Report before removing your card.",
   openSafetyReport: "Open Safety Report",
   openFolder: "Open folder",
   openInFinder: "Show in Finder",
@@ -51,23 +51,24 @@ export const COPY = {
 
   // Studio Profile (inline optional question — NOT "Studio name on photos")
   profilePromptInline:
-    "Want copyright info added to your files? It's invisible metadata \u2014 only editing apps see it. (Optional)",
-  profileTitleInline: "Copyright metadata",
+    "Want copyright info added to your files? It\u2019s invisible \u2014 only editing apps see it. (Optional)",
+  profileTitleInline: "Copyright info",
   profileDescription:
-    "Adds your name and \u00A9 line to each photo's metadata. Lightroom and Capture One show it automatically.",
+    "Adds your name and \u00A9 line to each photo. Lightroom and Capture One show it automatically.",
   profileTurnOn: "Set it up",
   profileNotNow: "Not now",
 
   // AI onboarding (inline optional question)
-  aiPromptInline: "Want local AI features too? Optional — core imports work without AI.",
-  aiTitleInline: "Local AI features",
+  aiPromptInline:
+    "Want smart folder organization? Optional \u2014 runs on your computer, no internet needed.",
+  aiTitleInline: "Smart folders",
   aiDescription:
-    "Install and enable optional AI helpers during setup, or skip for now and do it later in Settings.",
+    "Organizes your shoots by camera, date, or content automatically. Skip for now and turn it on later in Settings.",
   aiSetupNow: "Set up AI",
   aiNotNow: "Not now",
 
   // Naming step
-  namingPrompt: "What\u2019s this shoot called?",
+  namingPrompt: "Give this shoot a name \u2014 it\u2019ll be your project folder.",
   namingTitle: "Name this project",
   namingPlaceholder: "e.g. Josh & Kelly \u2014 Swan Point",
   savePhotosButton: "Save photos",
@@ -120,6 +121,14 @@ export const COPY = {
   completionShowFinder: "Show in Finder",
   completionOpenLR: "Open in Lightroom",
   completionEject: "Eject card",
+
+  // Model download
+  modelDownloading: "Getting smart folders ready\u2026",
+  modelDownloadProgress: (completedMb: number, totalMb: number) =>
+    `Downloading: ${completedMb} / ${totalMb} MB`,
+  modelDownloadReady: "Ready!",
+  modelDownloadFailed: "Download failed. Try again or choose a preset layout.",
+  modelInstallOllama: "To use smart folders, install the free Ollama app from ollama.ai",
 
   // Affordances
   showDetails: "Show details",
