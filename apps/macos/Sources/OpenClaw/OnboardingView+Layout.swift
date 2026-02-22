@@ -57,6 +57,10 @@ extension OnboardingView {
             Task { await self.onboardingWizard.cancelIfRunning() }
         }
         .task {
+            // Photographer mode: auto-set local connection if unconfigured (skips gateway choice page).
+            if self.state.connectionMode == .unconfigured {
+                self.state.connectionMode = .local
+            }
             await self.refreshPerms()
             self.refreshCLIStatus()
             await self.loadWorkspaceDefaults()

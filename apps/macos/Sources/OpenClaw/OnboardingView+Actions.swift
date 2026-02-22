@@ -69,9 +69,51 @@ extension OnboardingView {
     }
 
     func finish() {
+        // Persist storage config if the user set destinations during onboarding.
+        if !self.storagePrimaryDest.isEmpty {
+            Task {
+                var root = await ConfigStore.load()
+                var photo = root["photo"] as? [String: Any] ?? [:]
+                photo["default_dest"] = self.storagePrimaryDest
+                if !self.storageBackupDest.isEmpty {
+                    photo["backup_dest"] = self.storageBackupDest
+                }
+                root["photo"] = photo
+                try? await ConfigStore.save(root)
+            }
+        }
         UserDefaults.standard.set(true, forKey: "openclaw.onboardingSeen")
         UserDefaults.standard.set(currentOnboardingVersion, forKey: onboardingVersionKey)
         OnboardingController.shared.close()
+    }
+
+    func pickStorageFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Select Folder"
+        panel.message = self.storagePickerTarget == .primary
+            ? "Choose where BaxBot should save your photos."
+            : "Choose a backup location (ideally a separate drive)."
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            switch self.storagePickerTarget {
+            case .primary:
+                self.storagePrimaryDest = url.path
+            case .backup:
+                self.storageBackupDest = url.path
+            }
+        }
+    }
+
+    func isSameVolume(_ pathA: String, _ pathB: String) -> Bool {
+        let urlA = URL(fileURLWithPath: pathA)
+        let urlB = URL(fileURLWithPath: pathB)
+        let volA = try? urlA.resourceValues(forKeys: [.volumeIdentifierKey]).volumeIdentifier as? NSObject
+        let volB = try? urlB.resourceValues(forKeys: [.volumeIdentifierKey]).volumeIdentifier as? NSObject
+        guard let a = volA, let b = volB else { return false }
+        return a.isEqual(b)
     }
 
     func copyToPasteboard(_ text: String) {
@@ -117,7 +159,7 @@ extension OnboardingView {
                 verifier: pkce.verifier)
             try OpenClawOAuthStore.saveAnthropicOAuth(creds)
             self.refreshAnthropicOAuthStatus()
-            self.anthropicAuthStatus = "Connected. OpenClaw can now use Claude."
+            self.anthropicAuthStatus = "Connected. BaxBot can now use Claude."
         } catch {
             self.anthropicAuthStatus = "OAuth failed: \(error.localizedDescription)"
         }

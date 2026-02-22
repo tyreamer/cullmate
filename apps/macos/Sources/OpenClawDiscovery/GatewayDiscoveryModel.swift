@@ -76,7 +76,7 @@ public final class GatewayDiscoveryModel {
     private var pendingServiceResolvers: [String: GatewayServiceResolver] = [:]
     private var wideAreaFallbackTask: Task<Void, Never>?
     private var wideAreaFallbackGateways: [DiscoveredGateway] = []
-    private let logger = Logger(subsystem: "ai.openclaw", category: "gateway-discovery")
+    private let logger = Logger(subsystem: "ai.baxbot", category: "gateway-discovery")
 
     public init(
         localDisplayName: String? = nil,
@@ -116,7 +116,7 @@ public final class GatewayDiscoveryModel {
             }
 
             self.browsers[domain] = browser
-            browser.start(queue: DispatchQueue(label: "ai.openclaw.macos.gateway-discovery.\(domain)"))
+            browser.start(queue: DispatchQueue(label: "ai.baxbot.macos.gateway-discovery.\(domain)"))
         }
 
         self.scheduleWideAreaFallback()

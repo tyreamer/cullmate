@@ -4,7 +4,7 @@ import Foundation
 import Observation
 import SwiftUI
 
-/// Menu contents for the OpenClaw menu bar extra.
+/// Menu contents for the BaxBot menu bar extra.
 struct MenuContent: View {
     @Bindable var state: AppState
     let updater: UpdaterProviding?
@@ -80,13 +80,13 @@ struct MenuContent: View {
                 Button {
                     self.state.isPaused = true
                 } label: {
-                    Label("Stop Gateway", systemImage: "stop.circle")
+                    Label("Stop BaxBot Helper", systemImage: "stop.circle")
                 }
             } else {
                 Button {
                     self.state.isPaused = false
                 } label: {
-                    Label("Start Gateway", systemImage: "play.circle")
+                    Label("Start BaxBot Helper", systemImage: "play.circle")
                 }
             }
 

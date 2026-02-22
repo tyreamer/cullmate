@@ -5,7 +5,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>OpenClaw</string>
+    <string>BaxBot</string>
     <key>CFBundleIdentifier</key>
     <string>ai.baxbot.mac</string>
     <key>CFBundleInfoDictionaryVersion</key>
@@ -19,15 +19,15 @@
     <key>CFBundleVersion</key>
     <string>202602160</string>
     <key>CFBundleIconFile</key>
-    <string>OpenClaw</string>
+    <string>BaxBot</string>
     <key>CFBundleURLTypes</key>
     <array>
         <dict>
             <key>CFBundleURLName</key>
-            <string>ai.openclaw.mac.deeplink</string>
+            <string>ai.baxbot.mac.deeplink</string>
             <key>CFBundleURLSchemes</key>
             <array>
-                <string>openclaw</string>
+                <string>baxbot</string>
             </array>
         </dict>
     </array>
@@ -36,29 +36,29 @@
     <key>LSUIElement</key>
     <true/>
 
-    <key>OpenClawBuildTimestamp</key>
+    <key>BaxBotBuildTimestamp</key>
     <string></string>
-    <key>OpenClawGitCommit</key>
+    <key>BaxBotGitCommit</key>
     <string></string>
 
     <key>NSUserNotificationUsageDescription</key>
-    <string>BaxBot needs notification permission to show alerts for agent actions.</string>
+    <string>BaxBot sends alerts when your camera card is ready or your import finishes.</string>
     <key>NSScreenCaptureDescription</key>
-    <string>BaxBot captures the screen when the agent needs screenshots for context.</string>
+    <string>BaxBot may capture the screen to help with troubleshooting.</string>
     <key>NSCameraUsageDescription</key>
-    <string>BaxBot can capture photos or short video clips when requested by the agent.</string>
+    <string>BaxBot can capture photos or video when you request it.</string>
 	<key>NSLocationUsageDescription</key>
-	<string>BaxBot can share your location when requested by the agent.</string>
+	<string>BaxBot can tag photos with location data when you choose.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>BaxBot can share your location when requested by the agent.</string>
+	<string>BaxBot can tag photos with location data when you choose.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>BaxBot can share your location when requested by the agent.</string>
+	<string>BaxBot can tag photos with location data when you choose.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>BaxBot needs the mic for Voice Wake tests and agent audio capture.</string>
+	<string>BaxBot uses the microphone for voice commands.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
-    <string>BaxBot uses speech recognition to detect your Voice Wake trigger phrase.</string>
+    <string>BaxBot uses speech recognition for voice commands.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>BaxBot needs Automation (AppleScript) permission to drive Terminal and other apps for agent actions.</string>
+    <string>BaxBot uses Automation to open and control photo apps like Lightroom.</string>
 
     <key>NSAppTransportSecurity</key>
     <dict>

@@ -24,6 +24,10 @@ extension OnboardingView {
             self.onboardingChatPage()
         case 9:
             self.readyPage()
+        case 10:
+            self.storageSetupPage()
+        case 11:
+            self.photographerReadyPage()
         default:
             EmptyView()
         }
@@ -34,7 +38,7 @@ extension OnboardingView {
             VStack(spacing: 22) {
                 Text("Welcome to BaxBot")
                     .font(.largeTitle.weight(.semibold))
-                Text("BaxBot is your Studio Manager — it handles everything around the edit so you can focus on shooting.")
+                Text("BaxBot keeps your weddings safe and organized \u{2014} on this Mac.")
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -44,21 +48,17 @@ extension OnboardingView {
 
                 self.onboardingCard(spacing: 10, padding: 14) {
                     HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: "exclamationmark.triangle.fill")
+                        Image(systemName: "lock.fill")
                             .font(.title3.weight(.semibold))
-                            .foregroundStyle(Color(nsColor: .systemOrange))
+                            .foregroundStyle(Color.accentColor)
                             .frame(width: 22)
                             .padding(.top, 1)
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Security notice")
+                            Text("Runs locally")
                                 .font(.headline)
                             Text(
-                                "The connected AI agent (e.g. Claude) can trigger powerful actions on your Mac, " +
-                                    "including running commands, reading/writing files, and capturing screenshots — " +
-                                    "depending on the permissions you grant.\n\n" +
-                                    "Only enable BaxBot if you understand the risks and trust the prompts and " +
-                                    "integrations you use.")
+                                "Everything stays on this Mac. Nothing uploads unless you export.")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -771,6 +771,111 @@ extension OnboardingView {
         guard !self.didLoadOnboardingSkills else { return }
         self.didLoadOnboardingSkills = true
         await self.onboardingSkillsModel.refresh()
+    }
+
+    // MARK: - Photographer onboarding pages
+
+    func storageSetupPage() -> some View {
+        self.onboardingPage {
+            Text("Where should BaxBot save your photos?")
+                .font(.largeTitle.weight(.semibold))
+            Text("BaxBot creates verified copies and saves a safety receipt.")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 520)
+                .fixedSize(horizontal: false, vertical: true)
+
+            self.onboardingCard(spacing: 14, padding: 16) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Primary destination")
+                        .font(.headline)
+                    HStack {
+                        Text(self.storagePrimaryDest.isEmpty ? "No folder selected" : self.storagePrimaryDest)
+                            .font(.callout)
+                            .foregroundStyle(self.storagePrimaryDest.isEmpty ? .secondary : .primary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Button("Choose\u{2026}") {
+                            self.storagePickerTarget = .primary
+                            self.pickStorageFolder()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+
+                    Divider().padding(.vertical, 4)
+
+                    Text("Backup destination (optional)")
+                        .font(.headline)
+                    HStack {
+                        Text(self.storageBackupDest.isEmpty ? "No backup folder" : self.storageBackupDest)
+                            .font(.callout)
+                            .foregroundStyle(self.storageBackupDest.isEmpty ? .secondary : .primary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Button("Choose\u{2026}") {
+                            self.storagePickerTarget = .backup
+                            self.pickStorageFolder()
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    if !self.storageBackupDest.isEmpty, !self.storagePrimaryDest.isEmpty,
+                       self.isSameVolume(self.storagePrimaryDest, self.storageBackupDest)
+                    {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            Text("Primary and backup are on the same drive. Use a separate drive for true redundancy.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    func photographerReadyPage() -> some View {
+        self.onboardingPage {
+            Text("You\u{2019}re all set")
+                .font(.largeTitle.weight(.semibold))
+            Text("Insert a card to begin.")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 520)
+                .fixedSize(horizontal: false, vertical: true)
+
+            self.onboardingCard(spacing: 12, padding: 16) {
+                self.featureRow(
+                    title: "Card detection",
+                    subtitle: "BaxBot watches for camera cards and alerts you when one is ready.",
+                    systemImage: "sdcard")
+                self.featureRow(
+                    title: "Verified copies",
+                    subtitle: "Every file is checked after copying to make sure nothing was lost.",
+                    systemImage: "checkmark.shield")
+                self.featureRow(
+                    title: "Safe to format",
+                    subtitle: "You get a clear yes or no before wiping your card.",
+                    systemImage: "externaldrive.badge.checkmark")
+
+                Divider().padding(.vertical, 4)
+
+                Toggle("Get an alert when a card is detected", isOn: Binding(
+                    get: { true },
+                    set: { _ in }))
+                    .font(.callout)
+                Toggle("Launch at login", isOn: self.$state.launchAtLogin)
+                    .font(.callout)
+                    .onChange(of: self.state.launchAtLogin) { _, newValue in
+                        AppStateStore.updateLaunchAtLogin(enabled: newValue)
+                    }
+            }
+        }
     }
 
     private var skillsOverview: some View {

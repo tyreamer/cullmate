@@ -13,7 +13,7 @@ final class VolumeWatcher {
     static let notificationCategory = "CULLMATE_CAMERA_CARD"
     static let actionIdentifier = "INGEST_ACTION"
 
-    private let logger = Logger(subsystem: "ai.openclaw", category: "volume-watcher")
+    private let logger = Logger(subsystem: "ai.baxbot", category: "volume-watcher")
     private var fsWatcher: CoalescingFSEventsWatcher?
     private var knownVolumes: Set<String> = []
     private var isRunning = false

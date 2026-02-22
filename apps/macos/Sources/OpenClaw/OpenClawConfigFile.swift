@@ -2,7 +2,7 @@ import Foundation
 import OpenClawProtocol
 
 enum OpenClawConfigFile {
-    private static let logger = Logger(subsystem: "ai.openclaw", category: "config")
+    private static let logger = Logger(subsystem: "ai.baxbot", category: "config")
     private static let configAuditFileName = "config-audit.jsonl"
 
     static func url() -> URL {

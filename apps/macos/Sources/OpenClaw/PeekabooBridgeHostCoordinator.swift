@@ -9,7 +9,7 @@ import Security
 final class PeekabooBridgeHostCoordinator {
     static let shared = PeekabooBridgeHostCoordinator()
 
-    private let logger = Logger(subsystem: "ai.openclaw", category: "PeekabooBridge")
+    private let logger = Logger(subsystem: "ai.baxbot", category: "PeekabooBridge")
 
     private var host: PeekabooBridgeHost?
     private var services: OpenClawPeekabooBridgeServices?

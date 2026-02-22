@@ -118,20 +118,31 @@ struct OnboardingView: View {
     }()
 
     let permissionsPageIndex = 5
+
+    /// Storage folder picker target (which destination is being picked).
+    enum StoragePickerTarget { case primary, backup }
+    @State var storagePrimaryDest: String = ""
+    @State var storageBackupDest: String = ""
+    @State var storagePickerTarget: StoragePickerTarget = .primary
+
     static func pageOrder(
         for mode: AppState.ConnectionMode,
-        showOnboardingChat: Bool) -> [Int]
+        showOnboardingChat: Bool,
+        developerMode: Bool = false) -> [Int]
     {
-        switch mode {
-        case .remote:
-            // Remote setup doesn't need local gateway/CLI/workspace setup pages,
-            // and WhatsApp/Telegram setup is optional.
-            showOnboardingChat ? [0, 1, 5, 8, 9] : [0, 1, 5, 9]
-        case .unconfigured:
-            showOnboardingChat ? [0, 1, 8, 9] : [0, 1, 9]
-        case .local:
-            showOnboardingChat ? [0, 1, 3, 5, 8, 9] : [0, 1, 3, 5, 9]
+        if developerMode {
+            // Developer mode: full original flow
+            switch mode {
+            case .remote:
+                return showOnboardingChat ? [0, 1, 5, 8, 9] : [0, 1, 5, 9]
+            case .unconfigured:
+                return showOnboardingChat ? [0, 1, 8, 9] : [0, 1, 9]
+            case .local:
+                return showOnboardingChat ? [0, 1, 3, 5, 8, 9] : [0, 1, 3, 5, 9]
+            }
         }
+        // Photographer mode: Welcome → Storage Setup → Ready
+        return [0, 10, 11]
     }
 
     var showOnboardingChat: Bool {
