@@ -334,8 +334,8 @@ export async function authorizeGatewayConnect(params: {
 
   // BaxBot local UX: for direct loopback usage on the same machine,
   // allow connection without prompting users for tokens/passwords.
-  if (localDirect && auth.mode !== "trusted-proxy") {
-    return { ok: true, method: "shared_secret" };
+  if (localDirect) {
+    return { ok: true, method: "none" };
   }
 
   const limiter = params.rateLimiter;
