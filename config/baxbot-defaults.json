@@ -1,5 +1,6 @@
 {
   "update": { "checkOnStart": false },
   "plugins": { "enabled": false },
-  "browser": { "enabled": false }
+  "browser": { "enabled": false },
+  "gateway": { "port": 19001 }
 }

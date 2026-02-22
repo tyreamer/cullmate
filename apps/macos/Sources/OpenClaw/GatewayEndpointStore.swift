@@ -177,6 +177,17 @@ actor GatewayEndpointStore {
             return nil
         }
 
+        // Check for auto-generated local auth token (zero-touch auth).
+        // The gateway writes this file on startup; reading it avoids token mismatch.
+        let localTokenPath = OpenClawPaths.stateDirURL
+            .appendingPathComponent("local-auth-token").path
+        if let localToken = try? String(contentsOfFile: localTokenPath, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !localToken.isEmpty
+        {
+            return localToken
+        }
+
         if let token = launchdSnapshot?.token?.trimmingCharacters(in: .whitespacesAndNewlines),
            !token.isEmpty
         {

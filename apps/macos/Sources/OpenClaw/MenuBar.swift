@@ -75,6 +75,8 @@ struct OpenClawApp: App {
             self.applyStatusItemAppearance(paused: self.state.isPaused, sleeping: self.isGatewaySleeping)
         }
         .onChange(of: self.state.connectionMode) { _, mode in
+            // Skip during onboarding — the setup page manages the gateway lifecycle.
+            guard AppStateStore.shared.onboardingSeen else { return }
             Task { await ConnectionModeCoordinator.shared.apply(mode: mode, paused: self.state.isPaused) }
             CLIInstallPrompter.shared.checkAndPromptIfNeeded(reason: "connection-mode")
         }
@@ -150,7 +152,14 @@ struct OpenClawApp: App {
         handler.translatesAutoresizingMaskIntoConstraints = false
         handler.onLeftClick = { [self] in
             HoverHUDController.shared.dismiss(reason: "statusItemClick")
-            self.toggleWebChatPanel()
+            if self.state.debugPaneEnabled {
+                self.toggleWebChatPanel()
+            } else {
+                // Photographer mode: left-click shows the dropdown menu (same as right-click).
+                WebChatManager.shared.closePanel()
+                self.isMenuPresented = true
+                self.updateStatusHighlight()
+            }
         }
         handler.onRightClick = { [self] in
             HoverHUDController.shared.dismiss(reason: "statusItemRightClick")
@@ -273,7 +282,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         self.state = AppStateStore.shared
         AppActivationPolicy.apply(showDockIcon: self.state?.showDockIcon ?? false)
-        if let state {
+        // Skip gateway lifecycle during onboarding — the onboarding setup page manages it.
+        let seenVersion = UserDefaults.standard.integer(forKey: onboardingVersionKey)
+        let needsOnboarding = seenVersion < currentOnboardingVersion || !AppStateStore.shared.onboardingSeen
+        if let state, !needsOnboarding {
             Task { await ConnectionModeCoordinator.shared.apply(mode: state.connectionMode, paused: state.isPaused) }
         }
         TerminationSignalWatcher.shared.start()

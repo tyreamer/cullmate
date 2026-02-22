@@ -322,18 +322,27 @@ final class GatewayProcessManager {
 
         let bundlePath = Bundle.main.bundleURL.path
         let port = GatewayEnvironment.gatewayPort()
-        self.appendLog("[gateway] enabling launchd job (\(gatewayLaunchdLabel)) on port \(port)\n")
-        self.logger.info("gateway enabling launchd port=\(port)")
-        let err = await GatewayLaunchAgentManager.set(enabled: true, bundlePath: bundlePath, port: port)
-        if let err {
-            self.status = .failed(err)
-            self.lastFailureReason = err
-            self.logger.error("gateway launchd enable failed: \(err)")
-            return
+
+        // Skip `install --force` if the launchd job is already loaded (avoids killing a running gateway).
+        let alreadyLoaded = await GatewayLaunchAgentManager.isLoaded()
+        if !alreadyLoaded {
+            self.appendLog("[gateway] enabling launchd job (\(gatewayLaunchdLabel)) on port \(port)\n")
+            self.logger.info("gateway enabling launchd port=\(port)")
+            let err = await GatewayLaunchAgentManager.set(enabled: true, bundlePath: bundlePath, port: port)
+            if let err {
+                self.status = .failed(err)
+                self.lastFailureReason = err
+                self.logger.error("gateway launchd enable failed: \(err)")
+                return
+            }
+        } else {
+            self.appendLog("[gateway] launchd job already loaded; waiting for health\n")
+            self.logger.info("gateway launchd already loaded, skipping install")
         }
 
         // Best-effort: wait for the gateway to accept connections.
-        let deadline = Date().addingTimeInterval(6)
+        // `install --force` restarts the launchd job which can take 15–20s on first boot.
+        let deadline = Date().addingTimeInterval(30)
         while Date() < deadline {
             if !self.desiredActive { return }
             do {

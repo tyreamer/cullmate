@@ -27,42 +27,42 @@ struct SettingsRootView: View {
                     .tabItem { Label("General", systemImage: "gearshape") }
                     .tag(SettingsTab.general)
 
-                ChannelsSettings()
-                    .tabItem { Label("Channels", systemImage: "link") }
-                    .tag(SettingsTab.channels)
-
-                VoiceWakeSettings(state: self.state, isActive: self.selectedTab == .voiceWake)
-                    .tabItem { Label("Voice Wake", systemImage: "waveform.circle") }
-                    .tag(SettingsTab.voiceWake)
-
-                ConfigSettings()
-                    .tabItem { Label("Config", systemImage: "slider.horizontal.3") }
-                    .tag(SettingsTab.config)
-
-                InstancesSettings()
-                    .tabItem { Label("Instances", systemImage: "network") }
-                    .tag(SettingsTab.instances)
-
-                SessionsSettings()
-                    .tabItem { Label("Sessions", systemImage: "clock.arrow.circlepath") }
-                    .tag(SettingsTab.sessions)
-
-                CronSettings()
-                    .tabItem { Label("Cron", systemImage: "calendar") }
-                    .tag(SettingsTab.cron)
-
-                SkillsSettings(state: self.state)
-                    .tabItem { Label("Skills", systemImage: "sparkles") }
-                    .tag(SettingsTab.skills)
-
-                PermissionsSettings(
-                    status: self.permissionMonitor.status,
-                    refresh: self.refreshPerms,
-                    showOnboarding: { DebugActions.restartOnboarding() })
-                    .tabItem { Label("Permissions", systemImage: "lock.shield") }
-                    .tag(SettingsTab.permissions)
-
                 if self.state.debugPaneEnabled {
+                    ChannelsSettings()
+                        .tabItem { Label("Channels", systemImage: "link") }
+                        .tag(SettingsTab.channels)
+
+                    VoiceWakeSettings(state: self.state, isActive: self.selectedTab == .voiceWake)
+                        .tabItem { Label("Voice Wake", systemImage: "waveform.circle") }
+                        .tag(SettingsTab.voiceWake)
+
+                    ConfigSettings()
+                        .tabItem { Label("Config", systemImage: "slider.horizontal.3") }
+                        .tag(SettingsTab.config)
+
+                    InstancesSettings()
+                        .tabItem { Label("Instances", systemImage: "network") }
+                        .tag(SettingsTab.instances)
+
+                    SessionsSettings()
+                        .tabItem { Label("Sessions", systemImage: "clock.arrow.circlepath") }
+                        .tag(SettingsTab.sessions)
+
+                    CronSettings()
+                        .tabItem { Label("Cron", systemImage: "calendar") }
+                        .tag(SettingsTab.cron)
+
+                    SkillsSettings(state: self.state)
+                        .tabItem { Label("Skills", systemImage: "sparkles") }
+                        .tag(SettingsTab.skills)
+
+                    PermissionsSettings(
+                        status: self.permissionMonitor.status,
+                        refresh: self.refreshPerms,
+                        showOnboarding: { DebugActions.restartOnboarding() })
+                        .tabItem { Label("Permissions", systemImage: "lock.shield") }
+                        .tag(SettingsTab.permissions)
+
                     DebugSettings(state: self.state)
                         .tabItem { Label("Debug", systemImage: "ant") }
                         .tag(SettingsTab.debug)
@@ -91,7 +91,7 @@ struct SettingsRootView: View {
             self.updatePermissionMonitoring(for: self.selectedTab)
         }
         .onChange(of: self.state.debugPaneEnabled) { _, enabled in
-            if !enabled, self.selectedTab == .debug {
+            if !enabled, self.selectedTab != .general, self.selectedTab != .about {
                 self.selectedTab = .general
             }
         }
@@ -140,7 +140,9 @@ struct SettingsRootView: View {
     }
 
     private func validTab(for requested: SettingsTab) -> SettingsTab {
-        if requested == .debug, !self.state.debugPaneEnabled { return .general }
+        if !self.state.debugPaneEnabled, requested != .general, requested != .about {
+            return .general
+        }
         return requested
     }
 

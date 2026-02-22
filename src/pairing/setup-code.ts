@@ -1,7 +1,7 @@
 import os from "node:os";
 import type { OpenClawConfig } from "../config/types.js";
 
-const DEFAULT_GATEWAY_PORT = 18789;
+const DEFAULT_GATEWAY_PORT = 19001;
 
 export type PairingSetupPayload = {
   url: string;

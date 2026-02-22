@@ -131,12 +131,20 @@ extension OnboardingView {
                 try? await Task.sleep(nanoseconds: 1_200_000_000)
                 self.finish()
                 return
-            case let .failed(reason):
-                withAnimation {
-                    self.gatewaySetupStatus = reason
-                    self.gatewaySetupFailed = true
+            case .failed:
+                // The process manager gave up, but the gateway may still be booting
+                // after a launchd restart. Keep polling instead of giving up immediately.
+                let elapsed = Date().timeIntervalSince(deadline.addingTimeInterval(-90))
+                if elapsed > 60 {
+                    withAnimation {
+                        self.gatewaySetupStatus = "Setup is taking longer than expected."
+                        self.gatewaySetupFailed = true
+                    }
+                    return
                 }
-                return
+                self.gatewaySetupStatus = "Waiting for gateway…"
+                // Retry activation — the process manager may have timed out prematurely.
+                GatewayProcessManager.shared.setActive(true)
             case .starting:
                 // Update status message based on elapsed time.
                 let elapsed = Date().timeIntervalSince(deadline.addingTimeInterval(-90))

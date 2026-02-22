@@ -29,48 +29,52 @@ struct GeneralSettings: View {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 12) {
                     SettingsToggleRow(
-                        title: "BaxBot active",
-                        subtitle: "Pause to stop the BaxBot gateway; no messages will be processed.",
-                        binding: self.activeBinding)
-
-                    self.connectionSection
-
-                    Divider()
-
-                    SettingsToggleRow(
                         title: "Launch at login",
                         subtitle: "Automatically start BaxBot after you sign in.",
                         binding: self.$state.launchAtLogin)
-
-                    SettingsToggleRow(
-                        title: "Show Dock icon",
-                        subtitle: "Keep BaxBot visible in the Dock instead of menu-bar-only mode.",
-                        binding: self.$state.showDockIcon)
 
                     SettingsToggleRow(
                         title: "Play menu bar icon animations",
                         subtitle: "Enable idle blinks and wiggles on the status icon.",
                         binding: self.$state.iconAnimationsEnabled)
 
-                    SettingsToggleRow(
-                        title: "Allow Canvas",
-                        subtitle: "Allow the agent to show and control the Canvas panel.",
-                        binding: self.$state.canvasEnabled)
-
-                    SettingsToggleRow(
-                        title: "Allow Camera",
-                        subtitle: "Allow the agent to capture a photo or short video via the built-in camera.",
-                        binding: self.$cameraEnabled)
-
-                    SettingsToggleRow(
-                        title: "Enable Peekaboo Bridge",
-                        subtitle: "Allow signed tools (e.g. `peekaboo`) to drive UI automation via PeekabooBridge.",
-                        binding: self.$state.peekabooBridgeEnabled)
+                    Divider()
 
                     SettingsToggleRow(
                         title: "Enable debug tools",
-                        subtitle: "Show the Debug tab with development utilities.",
+                        subtitle: "Show advanced developer tabs in Settings.",
                         binding: self.$state.debugPaneEnabled)
+
+                    if self.state.debugPaneEnabled {
+                        SettingsToggleRow(
+                            title: "BaxBot active",
+                            subtitle: "Pause to stop the BaxBot gateway; no messages will be processed.",
+                            binding: self.activeBinding)
+
+                        self.connectionSection
+
+                        Divider()
+
+                        SettingsToggleRow(
+                            title: "Show Dock icon",
+                            subtitle: "Keep BaxBot visible in the Dock instead of menu-bar-only mode.",
+                            binding: self.$state.showDockIcon)
+
+                        SettingsToggleRow(
+                            title: "Allow Canvas",
+                            subtitle: "Allow the agent to show and control the Canvas panel.",
+                            binding: self.$state.canvasEnabled)
+
+                        SettingsToggleRow(
+                            title: "Allow Camera",
+                            subtitle: "Allow the agent to capture a photo or short video via the built-in camera.",
+                            binding: self.$cameraEnabled)
+
+                        SettingsToggleRow(
+                            title: "Enable Peekaboo Bridge",
+                            subtitle: "Allow signed tools (e.g. `peekaboo`) to drive UI automation via PeekabooBridge.",
+                            binding: self.$state.peekabooBridgeEnabled)
+                    }
                 }
 
                 Spacer(minLength: 12)

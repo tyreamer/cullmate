@@ -73,16 +73,21 @@ enum GatewayEnvironment {
     private static let logger = Logger(subsystem: "ai.baxbot", category: "gateway.env")
     private static let supportedBindModes: Set<String> = ["loopback", "tailnet", "lan", "auto"]
 
+    static let baxbotDefaultPort = 19001
+
     static func gatewayPort() -> Int {
-        if let raw = ProcessInfo.processInfo.environment["OPENCLAW_GATEWAY_PORT"] {
-            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            if let parsed = Int(trimmed), parsed > 0 { return parsed }
+        // BaxBot env var takes precedence over legacy OpenClaw env var.
+        for key in ["CULLMATE_GATEWAY_PORT", "OPENCLAW_GATEWAY_PORT"] {
+            if let raw = ProcessInfo.processInfo.environment[key] {
+                let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let parsed = Int(trimmed), parsed > 0 { return parsed }
+            }
         }
         if let configPort = OpenClawConfigFile.gatewayPort(), configPort > 0 {
             return configPort
         }
         let stored = UserDefaults.standard.integer(forKey: "gatewayPort")
-        return stored > 0 ? stored : 18789
+        return stored > 0 ? stored : baxbotDefaultPort
     }
 
     static func expectedGatewayVersion() -> Semver? {
