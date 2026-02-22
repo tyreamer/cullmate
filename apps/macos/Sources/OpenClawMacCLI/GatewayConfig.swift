@@ -21,6 +21,8 @@ struct GatewayEndpoint {
 func loadGatewayConfig() -> GatewayConfig {
     let home = FileManager().homeDirectoryForCurrentUser
     let candidates = [
+        home.appendingPathComponent(".baxbot/cullmate.json"),
+        home.appendingPathComponent(".cullmate/cullmate.json"),
         home.appendingPathComponent(".openclaw/openclaw.json"),
     ]
     let url = candidates.first { FileManager().isReadableFile(atPath: $0.path) } ?? candidates[0]
