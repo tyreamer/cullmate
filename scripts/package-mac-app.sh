@@ -257,7 +257,7 @@ GATEWAY_DEST="$APP_ROOT/Contents/Resources/gateway"
 mkdir -p "$GATEWAY_DEST"
 # Copy the bundled JS gateway (tsdown output), excluding the .app bundle itself
 if [ -d "$ROOT_DIR/dist" ]; then
-  rsync -a --exclude='BaxBot.app' "$ROOT_DIR/dist/" "$GATEWAY_DEST/dist/"
+  rsync -a --exclude='*.app' --exclude='*.zip' --exclude='*.dmg' --exclude='*.dSYM' "$ROOT_DIR/dist/" "$GATEWAY_DEST/dist/"
   echo "    → dist/ copied ($(du -sh "$GATEWAY_DEST/dist" | cut -f1))"
 else
   echo "ERROR: dist/ directory not found — run pnpm build first" >&2
