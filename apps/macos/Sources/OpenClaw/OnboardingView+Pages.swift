@@ -850,6 +850,23 @@ extension OnboardingView {
                 .fixedSize(horizontal: false, vertical: true)
 
             self.onboardingCard(spacing: 12, padding: 16) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "menubar.arrow.up.rectangle")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("BaxBot lives in your menu bar")
+                            .font(.headline)
+                        Text("Look for the little character in the top-right of your screen. Left-click it to open the Studio Manager.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                Divider().padding(.vertical, 4)
+
                 self.featureRow(
                     title: "Card detection",
                     subtitle: "BaxBot watches for camera cards and alerts you when one is ready.",

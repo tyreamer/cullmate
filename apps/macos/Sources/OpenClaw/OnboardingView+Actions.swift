@@ -3,6 +3,7 @@ import Foundation
 import OpenClawDiscovery
 import OpenClawIPC
 import SwiftUI
+import UserNotifications
 
 extension OnboardingView {
     func selectLocalGateway() {
@@ -84,7 +85,25 @@ extension OnboardingView {
         }
         UserDefaults.standard.set(true, forKey: "openclaw.onboardingSeen")
         UserDefaults.standard.set(currentOnboardingVersion, forKey: onboardingVersionKey)
+
+        // Request notification permission proactively so card detection alerts work immediately.
+        Task {
+            let center = UNUserNotificationCenter.current()
+            let settings = await center.notificationSettings()
+            if settings.authorizationStatus == .notDetermined {
+                _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+            }
+        }
+
         OnboardingController.shared.close()
+
+        // Auto-open the Studio Manager so the user isn't left staring at an empty screen.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            Task { @MainActor in
+                let sessionKey = await WebChatManager.shared.preferredSessionKey()
+                WebChatManager.shared.show(sessionKey: sessionKey)
+            }
+        }
     }
 
     func pickStorageFolder() {
