@@ -64,13 +64,15 @@ struct MenuContent: View {
             } label: {
                 Label("Open BaxBot", systemImage: "gauge")
             }
-            Button {
-                Task { @MainActor in
-                    let sessionKey = await WebChatManager.shared.preferredSessionKey()
-                    WebChatManager.shared.show(sessionKey: sessionKey)
+            if self.state.debugPaneEnabled {
+                Button {
+                    Task { @MainActor in
+                        let sessionKey = await WebChatManager.shared.preferredSessionKey()
+                        WebChatManager.shared.show(sessionKey: sessionKey)
+                    }
+                } label: {
+                    Label("Open Chat", systemImage: "bubble.left.and.bubble.right")
                 }
-            } label: {
-                Label("Open Chat", systemImage: "bubble.left.and.bubble.right")
             }
 
             Divider()

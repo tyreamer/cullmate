@@ -91,11 +91,17 @@ extension OnboardingView {
 
         OnboardingController.shared.close()
 
-        // Auto-open the Studio Manager so the user isn't left staring at an empty screen.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        // Auto-open the Studio Manager (web dashboard) so the user isn't left staring at nothing.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             Task { @MainActor in
-                let sessionKey = await WebChatManager.shared.preferredSessionKey()
-                WebChatManager.shared.show(sessionKey: sessionKey)
+                do {
+                    let config = try await GatewayEndpointStore.shared.requireConfig()
+                    let url = try GatewayEndpointStore.dashboardURL(
+                        for: config, mode: AppStateStore.shared.connectionMode)
+                    NSWorkspace.shared.open(url)
+                } catch {
+                    // Gateway not ready yet — that's OK, the menu bar icon is there.
+                }
             }
         }
     }
