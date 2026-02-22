@@ -37,14 +37,14 @@ enum CLIInstaller {
     static func install(statusHandler: @escaping @MainActor @Sendable (String) async -> Void) async {
         let expected = GatewayEnvironment.expectedGatewayVersionString() ?? "latest"
         let prefix = Self.installPrefix()
-        await statusHandler("Installing openclaw CLI…")
+        await statusHandler("Installing BaxBot CLI…")
         let cmd = self.installScriptCommand(version: expected, prefix: prefix)
         let response = await ShellExecutor.runDetailed(command: cmd, cwd: nil, env: nil, timeout: 900)
 
         if response.success {
             let parsed = self.parseInstallEvents(response.stdout)
             let installedVersion = parsed.last { $0.event == "done" }?.version
-            let summary = installedVersion.map { "Installed openclaw \($0)." } ?? "Installed openclaw."
+            let summary = installedVersion.map { "Installed BaxBot CLI \($0)." } ?? "Installed BaxBot CLI."
             await statusHandler(summary)
             return
         }

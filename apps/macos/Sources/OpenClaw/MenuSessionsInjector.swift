@@ -170,6 +170,9 @@ extension MenuSessionsInjector {
             menu.removeItem(item)
         }
 
+        // In photographer mode (debug pane disabled), skip session/usage injection entirely.
+        guard AppStateStore.shared.debugPaneEnabled else { return }
+
         guard let insertIndex = self.findInsertIndex(in: menu) else { return }
         let width = self.initialWidth(for: menu)
         let isConnected = self.isControlChannelConnected
@@ -276,6 +279,9 @@ extension MenuSessionsInjector {
         for item in menu.items where item.tag == self.nodesTag {
             menu.removeItem(item)
         }
+
+        // In photographer mode (debug pane disabled), skip nodes injection entirely.
+        guard AppStateStore.shared.debugPaneEnabled else { return }
 
         guard let insertIndex = self.findNodesInsertIndex(in: menu) else { return }
         let width = self.initialWidth(for: menu)

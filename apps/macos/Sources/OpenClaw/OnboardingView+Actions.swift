@@ -70,18 +70,12 @@ extension OnboardingView {
     }
 
     func finish() {
-        // Persist storage config if the user set destinations during onboarding.
+        // Persist storage config to UserDefaults (BaxBot-specific, not the gateway config file).
         if !self.storagePrimaryDest.isEmpty {
-            Task {
-                var root = await ConfigStore.load()
-                var photo = root["photo"] as? [String: Any] ?? [:]
-                photo["default_dest"] = self.storagePrimaryDest
-                if !self.storageBackupDest.isEmpty {
-                    photo["backup_dest"] = self.storageBackupDest
-                }
-                root["photo"] = photo
-                try? await ConfigStore.save(root)
-            }
+            UserDefaults.standard.set(self.storagePrimaryDest, forKey: "baxbot.photo.primaryDest")
+        }
+        if !self.storageBackupDest.isEmpty {
+            UserDefaults.standard.set(self.storageBackupDest, forKey: "baxbot.photo.backupDest")
         }
         UserDefaults.standard.set(true, forKey: "openclaw.onboardingSeen")
         UserDefaults.standard.set(currentOnboardingVersion, forKey: onboardingVersionKey)
