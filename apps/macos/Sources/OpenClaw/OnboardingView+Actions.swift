@@ -91,18 +91,74 @@ extension OnboardingView {
 
         OnboardingController.shared.close()
 
-        // Auto-open the Studio Manager (web dashboard) so the user isn't left staring at nothing.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            Task { @MainActor in
-                do {
-                    let config = try await GatewayEndpointStore.shared.requireConfig()
-                    let url = try GatewayEndpointStore.dashboardURL(
-                        for: config, mode: AppStateStore.shared.connectionMode)
-                    NSWorkspace.shared.open(url)
-                } catch {
-                    // Gateway not ready yet — that's OK, the menu bar icon is there.
+        // Auto-open the Studio Manager (web dashboard).
+        Task { @MainActor in
+            do {
+                let config = try await GatewayEndpointStore.shared.requireConfig()
+                let url = try GatewayEndpointStore.dashboardURL(
+                    for: config, mode: AppStateStore.shared.connectionMode)
+                NSWorkspace.shared.open(url)
+            } catch {
+                // Gateway already confirmed ready; URL build failed — menu bar icon is there.
+            }
+        }
+    }
+
+    @MainActor
+    func runGatewaySetup() async {
+        self.gatewaySetupDone = false
+        self.gatewaySetupFailed = false
+        self.gatewaySetupStatus = "Starting BaxBot…"
+
+        // 1. Activate the gateway process manager.
+        GatewayProcessManager.shared.setActive(true)
+        self.gatewaySetupStatus = "Installing gateway service…"
+
+        // 2. Poll until the gateway is healthy (up to 90 seconds for npm install).
+        let deadline = Date().addingTimeInterval(90)
+        var lastStatus = GatewayProcessManager.shared.status
+        while Date() < deadline {
+            let status = GatewayProcessManager.shared.status
+            switch status {
+            case .running, .attachedExisting:
+                // Gateway is up — verify health endpoint.
+                withAnimation { self.gatewaySetupStatus = "Almost ready…" }
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                withAnimation {
+                    self.gatewaySetupDone = true
+                }
+                // Auto-close after a brief pause to show the checkmark.
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                self.finish()
+                return
+            case let .failed(reason):
+                withAnimation {
+                    self.gatewaySetupStatus = reason
+                    self.gatewaySetupFailed = true
+                }
+                return
+            case .starting:
+                // Update status message based on elapsed time.
+                let elapsed = Date().timeIntervalSince(deadline.addingTimeInterval(-90))
+                if elapsed > 30 {
+                    self.gatewaySetupStatus = "Still setting up — this only happens once…"
+                } else if elapsed > 10 {
+                    self.gatewaySetupStatus = "Installing gateway service…"
+                }
+            case .stopped:
+                // Retry activation if it stopped unexpectedly.
+                if lastStatus != .stopped {
+                    GatewayProcessManager.shared.setActive(true)
                 }
             }
+            lastStatus = status
+            try? await Task.sleep(nanoseconds: 800_000_000)
+        }
+
+        // Timeout.
+        withAnimation {
+            self.gatewaySetupStatus = "Setup is taking longer than expected. Check your internet connection and try again."
+            self.gatewaySetupFailed = true
         }
     }
 

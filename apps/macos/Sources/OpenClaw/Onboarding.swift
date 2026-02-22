@@ -125,6 +125,11 @@ struct OnboardingView: View {
     @State var storageBackupDest: String = ""
     @State var storagePickerTarget: StoragePickerTarget = .primary
 
+    /// Gateway setup progress (page 12).
+    @State var gatewaySetupStatus: String = "Starting BaxBot…"
+    @State var gatewaySetupDone = false
+    @State var gatewaySetupFailed = false
+
     static func pageOrder(
         for mode: AppState.ConnectionMode,
         showOnboardingChat: Bool,
@@ -141,8 +146,8 @@ struct OnboardingView: View {
                 return showOnboardingChat ? [0, 1, 3, 5, 8, 9] : [0, 1, 3, 5, 9]
             }
         }
-        // Photographer mode: Welcome → Storage Setup → Ready
-        return [0, 10, 11]
+        // Photographer mode: Welcome → Storage Setup → Ready → Setting Up
+        return [0, 10, 11, 12]
     }
 
     var showOnboardingChat: Bool {
@@ -162,7 +167,9 @@ struct OnboardingView: View {
     }
 
     var buttonTitle: String {
-        self.currentPage == self.pageCount - 1 ? "Finish" : "Next"
+        if self.activePageIndex == 11 { return "Get Started" }
+        if self.currentPage == self.pageCount - 1 { return "Finish" }
+        return "Next"
     }
 
     var wizardPageOrderIndex: Int? {

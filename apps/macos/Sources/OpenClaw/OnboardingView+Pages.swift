@@ -28,6 +28,8 @@ extension OnboardingView {
             self.storageSetupPage()
         case 11:
             self.photographerReadyPage()
+        case 12:
+            self.gatewaySetupPage()
         default:
             EmptyView()
         }
@@ -892,6 +894,58 @@ extension OnboardingView {
                         AppStateStore.updateLaunchAtLogin(enabled: newValue)
                     }
             }
+        }
+    }
+
+    func gatewaySetupPage() -> some View {
+        self.onboardingPage {
+            Spacer().frame(height: 40)
+
+            if self.gatewaySetupDone {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.green)
+                    .transition(.scale.combined(with: .opacity))
+                Text("BaxBot is ready")
+                    .font(.largeTitle.weight(.semibold))
+                Text("Opening Studio Manager…")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            } else if self.gatewaySetupFailed {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.orange)
+                Text("Setup needs attention")
+                    .font(.largeTitle.weight(.semibold))
+                Text(self.gatewaySetupStatus)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 420)
+
+                Button("Try Again") {
+                    self.gatewaySetupFailed = false
+                    self.gatewaySetupStatus = "Starting BaxBot…"
+                    Task { await self.runGatewaySetup() }
+                }
+                .buttonStyle(.borderedProminent)
+                .padding(.top, 8)
+            } else {
+                ProgressView()
+                    .controlSize(.large)
+                    .padding(.bottom, 8)
+                Text("Setting up BaxBot")
+                    .font(.largeTitle.weight(.semibold))
+                Text(self.gatewaySetupStatus)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 420)
+                    .animation(.easeInOut(duration: 0.2), value: self.gatewaySetupStatus)
+            }
+        }
+        .task {
+            await self.runGatewaySetup()
         }
     }
 

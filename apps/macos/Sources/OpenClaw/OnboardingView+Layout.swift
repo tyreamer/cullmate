@@ -25,7 +25,9 @@ extension OnboardingView {
             .frame(height: self.contentHeight)
 
             Spacer(minLength: 0)
-            self.navigationBar
+            if self.activePageIndex != 12 {
+                self.navigationBar
+            }
         }
         .frame(width: self.pageWidth, height: Self.windowHeight)
         .background(Color(NSColor.windowBackgroundColor))
