@@ -45,6 +45,38 @@ pnpm test:watch           # Watch mode
 
 To run a single test file: `pnpm vitest run src/path/to/file.test.ts`
 
+## macOS App Packaging & Distribution
+
+The macOS companion app outputs to `dist/macos/` (separate from the JS `dist/` folder).
+
+```bash
+# Build, sign, and package the .app bundle
+bash scripts/package-mac-app.sh        # → dist/macos/BaxBot.app
+
+# Full release: build + notarize + zip + dmg
+bash scripts/package-mac-dist.sh       # → dist/macos/BaxBot-<ver>.zip + .dmg
+
+# Skip JS/UI rebuild when only Swift changed
+SKIP_TSC=1 SKIP_UI_BUILD=1 bash scripts/package-mac-app.sh
+
+# Notarize manually (after package-mac-app.sh)
+ditto -c -k --keepParent dist/macos/BaxBot.app dist/macos/BaxBot-notarize.zip
+xcrun notarytool submit dist/macos/BaxBot-notarize.zip --keychain-profile baxbot-notary --wait
+xcrun stapler staple dist/macos/BaxBot.app
+rm dist/macos/BaxBot-notarize.zip
+ditto -c -k --keepParent dist/macos/BaxBot.app dist/macos/BaxBot.zip
+```
+
+**Notary credentials** (stored in Keychain as `baxbot-notary`):
+
+- Apple ID: `ty.reamer@yahoo.com`
+- Team ID: `7CDE3U5589`
+- Re-store if lost: `xcrun notarytool store-credentials baxbot-notary --apple-id "ty.reamer@yahoo.com" --team-id "7CDE3U5589" --password "<app-specific-password>"`
+
+**Key scripts**: `scripts/package-mac-app.sh`, `scripts/package-mac-dist.sh`, `scripts/codesign-mac-app.sh`, `scripts/restart-mac.sh`
+
+**Swift product name**: The Swift package still builds as `OpenClaw` (matches `Package.swift`). The binary is renamed to `BaxBot` during packaging.
+
 ## Architecture Overview
 
 ```

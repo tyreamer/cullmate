@@ -2,10 +2,10 @@
 set -euo pipefail
 
 # Build and bundle BaxBot into a minimal .app we can open.
-# Outputs to dist/BaxBot.app
+# Outputs to dist/macos/BaxBot.app
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-APP_ROOT="$ROOT_DIR/dist/BaxBot.app"
+APP_ROOT="$ROOT_DIR/dist/macos/BaxBot.app"
 BUILD_ROOT="$ROOT_DIR/apps/macos/.build"
 PRODUCT="OpenClaw"
 BUNDLE_ID="${BUNDLE_ID:-ai.baxbot.mac.debug}"

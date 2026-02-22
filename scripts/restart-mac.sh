@@ -203,10 +203,10 @@ choose_app_bundle() {
     return 0
   fi
 
-  if [[ -d "${ROOT_DIR}/dist/BaxBot.app" ]]; then
-    APP_BUNDLE="${ROOT_DIR}/dist/BaxBot.app"
+  if [[ -d "${ROOT_DIR}/dist/macos/BaxBot.app" ]]; then
+    APP_BUNDLE="${ROOT_DIR}/dist/macos/BaxBot.app"
     if [[ ! -d "${APP_BUNDLE}/Contents/Frameworks/Sparkle.framework" ]]; then
-      fail "dist/BaxBot.app missing Sparkle after packaging"
+      fail "dist/macos/BaxBot.app missing Sparkle after packaging"
     fi
     return 0
   fi
