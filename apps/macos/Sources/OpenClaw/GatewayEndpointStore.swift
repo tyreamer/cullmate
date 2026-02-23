@@ -347,7 +347,7 @@ actor GatewayEndpointStore {
                 env: ProcessInfo.processInfo.environment)
             self.setState(.ready(
                 mode: .remote,
-                url: URL(string: "\(scheme)://127.0.0.1:\(Int(port))")!,
+                url: URL(string: "\(scheme)://\(Self.localFriendlyHost):\(Int(port))")!,
                 token: token,
                 password: password))
         case .unconfigured:
@@ -611,6 +611,10 @@ actor GatewayEndpointStore {
         return "ws"
     }
 
+    /// The friendly hostname used for browser-facing URLs.
+    /// Modern browsers resolve `*.localhost` to 127.0.0.1 automatically (RFC 6761).
+    static let localFriendlyHost = "baxbot.localhost"
+
     private static func resolveLocalGatewayHost(
         bindMode: String?,
         customBindHost: String?,
@@ -618,13 +622,13 @@ actor GatewayEndpointStore {
     {
         switch bindMode {
         case "tailnet":
-            tailscaleIP ?? "127.0.0.1"
+            tailscaleIP ?? Self.localFriendlyHost
         case "auto":
-            "127.0.0.1"
+            Self.localFriendlyHost
         case "custom":
-            customBindHost ?? "127.0.0.1"
+            customBindHost ?? Self.localFriendlyHost
         default:
-            "127.0.0.1"
+            Self.localFriendlyHost
         }
     }
 }
