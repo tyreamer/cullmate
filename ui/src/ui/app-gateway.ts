@@ -339,19 +339,21 @@ async function loadServerSettings(app: OpenClawApp) {
     if (serverSettings) {
       // Apply server settings to app state
       const prefs = serverSettings.preferences;
-      const nextSettings = {
+      const nextSettings: typeof app.settings = {
         ...app.settings,
         theme: (prefs.theme as typeof app.settings.theme) ?? app.settings.theme,
-        developerMode: prefs.developerMode ?? app.settings.developerMode,
-        defaultSaveLocation: prefs.defaultSaveLocation ?? app.settings.defaultSaveLocation,
+        developerMode: (prefs.developerMode as boolean) ?? app.settings.developerMode,
+        defaultSaveLocation:
+          (prefs.defaultSaveLocation as string) ?? app.settings.defaultSaveLocation,
         defaultVerifyMode:
           (prefs.defaultVerifyMode as typeof app.settings.defaultVerifyMode) ??
           app.settings.defaultVerifyMode,
-        chatFocusMode: prefs.chatFocusMode ?? app.settings.chatFocusMode,
-        chatShowThinking: prefs.chatShowThinking ?? app.settings.chatShowThinking,
-        splitRatio: prefs.splitRatio ?? app.settings.splitRatio,
-        navCollapsed: prefs.navCollapsed ?? app.settings.navCollapsed,
-        navGroupsCollapsed: prefs.navGroupsCollapsed ?? app.settings.navGroupsCollapsed,
+        chatFocusMode: (prefs.chatFocusMode as boolean) ?? app.settings.chatFocusMode,
+        chatShowThinking: (prefs.chatShowThinking as boolean) ?? app.settings.chatShowThinking,
+        splitRatio: (prefs.splitRatio as number) ?? app.settings.splitRatio,
+        navCollapsed: (prefs.navCollapsed as boolean) ?? app.settings.navCollapsed,
+        navGroupsCollapsed:
+          (prefs.navGroupsCollapsed as Record<string, boolean>) ?? app.settings.navGroupsCollapsed,
       };
       app.applySettings(nextSettings);
 
@@ -387,6 +389,13 @@ async function loadServerSettings(app: OpenClawApp) {
         studioProfile.completedSetup ||
         folderTemplate !== null ||
         recentProjects.length > 0;
+
+      if (!hasLocalData) {
+        // Fresh install — reset onboarding flags that persist in settings key
+        if (app.settings.aiOnboardingDone) {
+          app.applySettings({ ...app.settings, aiOnboardingDone: false, aiFeaturesEnabled: false });
+        }
+      }
 
       if (hasLocalData && app.client) {
         await pushServerSettings(app.client, {

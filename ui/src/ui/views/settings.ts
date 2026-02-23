@@ -20,6 +20,7 @@ export type SettingsViewState = {
   onEditorChange: (editor: PreferredEditor) => void;
   onExportDiagnostics: () => void;
   diagnosticsExporting: boolean;
+  onResetOnboarding: () => void;
   onToggleAiFeatures: (enabled: boolean) => void;
   onRunAiSetup: () => void;
   modelDownloadStatus?: "idle" | "downloading" | "ready" | "error";
@@ -286,6 +287,18 @@ export function renderSettingsView(state: SettingsViewState) {
         }
         <p style="font-size: 0.72rem; color: var(--muted); margin: 6px 0 0;">
           Runs on your computer, no internet needed. Import and backup work fine without this.
+        </p>
+      </section>
+
+      <section>
+        <h3 style="font-size: 0.9rem; margin: 0 0 8px;">${COPY.startFreshButton}</h3>
+        <button
+          class="btn btn--sm"
+          @click=${state.onResetOnboarding}
+          style="padding: 6px 14px; font-size: 0.82rem;"
+        >${COPY.startFreshButton}</button>
+        <p style="font-size: 0.72rem; color: var(--muted); margin: 6px 0 0;">
+          ${COPY.startFreshDescription}
         </p>
       </section>
 

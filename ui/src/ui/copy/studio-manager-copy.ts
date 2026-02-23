@@ -145,6 +145,11 @@ export const COPY = {
   connectionErrorTitle: "Can\u2019t connect to BaxBot",
   openSettings: "Open Settings",
 
+  // Start fresh (reset onboarding)
+  startFreshButton: "Start fresh",
+  startFreshDescription:
+    "Resets your setup so you can walk through it again. Your saved photos are not affected.",
+
   // Diagnostics (Help section in Settings)
   diagnosticsTitle: "Help",
   diagnosticsButton: "Export diagnostics\u2026",

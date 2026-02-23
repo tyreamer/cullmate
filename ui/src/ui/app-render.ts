@@ -464,6 +464,7 @@ export function renderApp(state: AppViewState) {
                   state.handleSaveStudioProfile(updated);
                 },
                 onExportDiagnostics: () => state.handleExportDiagnostics(),
+                onResetOnboarding: () => state.resetOnboarding(),
                 onToggleAiFeatures: (enabled) =>
                   state.applySettings({
                     ...state.settings,
@@ -1330,6 +1331,7 @@ export function renderApp(state: AppViewState) {
                       state.handleSaveStudioProfile(updated);
                     },
                     onExportDiagnostics: () => state.handleExportDiagnostics(),
+                    onResetOnboarding: () => state.resetOnboarding(),
                     onToggleAiFeatures: (enabled) =>
                       state.applySettings({
                         ...state.settings,

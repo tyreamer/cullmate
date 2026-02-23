@@ -2070,6 +2070,69 @@ export class OpenClawApp extends LitElement {
     this.studioTimeline = updated;
   }
 
+  async resetOnboarding() {
+    // Reset setup state
+    this.storageConfig = null;
+    this.folderTemplate = null;
+    this.studioProfile = {
+      enabled: false,
+      displayName: "",
+      studioName: "",
+      website: "",
+      instagram: "",
+      city: "",
+      copyrightLine: "",
+      completedSetup: false,
+    };
+
+    // Reset onboarding flags in settings
+    this.applySettings({
+      ...this.settings,
+      aiOnboardingDone: false,
+      aiFeaturesEnabled: false,
+    });
+
+    // Clear localStorage keys
+    try {
+      localStorage.removeItem("cullmate.storage.config");
+      localStorage.removeItem("cullmate.studio-profile.v1");
+      localStorage.removeItem("cullmate.folder.template");
+      localStorage.removeItem("cullmate.ingest.recent");
+    } catch {
+      /* ignore */
+    }
+
+    // Push empty state to server
+    if (this.client) {
+      try {
+        const { pushServerSettings } = await import("./controllers/settings-sync.ts");
+        await pushServerSettings(this.client, {
+          preferences: {
+            theme: this.settings.theme,
+            developerMode: this.settings.developerMode,
+            defaultSaveLocation: this.settings.defaultSaveLocation,
+            defaultVerifyMode: this.settings.defaultVerifyMode,
+            chatFocusMode: this.settings.chatFocusMode,
+            chatShowThinking: this.settings.chatShowThinking,
+            splitRatio: this.settings.splitRatio,
+            navCollapsed: this.settings.navCollapsed,
+            navGroupsCollapsed: this.settings.navGroupsCollapsed,
+          },
+          storageConfig: null,
+          studioProfile: null,
+          folderTemplate: null,
+          recentProjects: [],
+        });
+      } catch (err) {
+        console.error("[reset-onboarding] push failed:", err);
+      }
+    }
+
+    // Close settings sheet and rebuild timeline
+    this.isSettingsSheetOpen = false;
+    this.rebuildStudioTimeline();
+  }
+
   rebuildStudioTimeline() {
     void import("./controllers/studio-manager.ts").then(({ buildStarterTimeline }) => {
       this.studioTimeline = buildStarterTimeline({

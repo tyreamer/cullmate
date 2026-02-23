@@ -84,6 +84,9 @@ export type AppViewState = {
   sidebarContent: string | null;
   sidebarError: string | null;
   splitRatio: number;
+  importOptionsExpanded: boolean;
+  diagnosticsExporting: boolean;
+  handleExportDiagnostics: () => Promise<void>;
   // Ingest state
   ingestStage: IngestStage;
   ingestSourcePath: string;
@@ -92,7 +95,7 @@ export type AppViewState = {
   ingestProgress: IngestProgress | null;
   ingestResult: IngestResult | null;
   ingestError: string | null;
-  ingestVerifyMode: "none" | "sentinel";
+  ingestVerifyMode: "none" | "sentinel" | "full";
   ingestDedupeEnabled: boolean;
   ingestRecentProjects: RecentProject[];
   ingestSuggestedSources: SuggestedSource[];
@@ -359,6 +362,8 @@ export type AppViewState = {
   handleSkipFolderTemplate: () => void;
   handleSmartOrganizerGenerate: () => void;
   handleTurnOnSmartOrganizer: () => void;
+  // Onboarding reset
+  resetOnboarding: () => Promise<void>;
   // Storage setup handlers
   handleOpenStorageSetup: () => void;
   handleSaveStorageSetup: (cfg: StorageConfig) => void;
