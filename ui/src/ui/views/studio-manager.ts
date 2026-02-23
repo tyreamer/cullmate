@@ -9,6 +9,8 @@ import type {
   TemplatePickerCard,
   ImportCard,
   StageProgressCard,
+  ProfileFormCard,
+  ProtectionChip,
 } from "../controllers/studio-manager.ts";
 import { buildTemplateTree } from "../controllers/studio-manager.ts";
 import { COPY } from "../copy/studio-manager-copy.ts";
@@ -200,7 +202,7 @@ function renderResultCard(card: ResultCard, state: StudioManagerViewState) {
   const variant = card.safeToFormat === true ? "safe" : "unsafe";
 
   return html`
-    <div class="studio-card studio-card--result studio-card--result-${variant}">
+    <div class="studio-card studio-card--result studio-card--result-${variant} studio-card--result-enter${card.safeToFormat === true ? " studio-card--result-safe-enter" : ""}">
       ${
         card.verdict
           ? html`
@@ -297,6 +299,66 @@ function renderFormCard(card: FormCard, state: StudioManagerViewState) {
           ?disabled=${!state.connected || !currentValue.trim()}
           @click=${() => state.onFormSubmit(card.fieldId, currentValue)}
         >${card.submitButton.label}</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderProfileFormCard(_card: ProfileFormCard, state: StudioManagerViewState) {
+  const nameValue = state.formValues["profile-displayName"] ?? "";
+  const studioValue = state.formValues["profile-studioName"] ?? "";
+  const websiteValue = state.formValues["profile-website"] ?? "";
+
+  return html`
+    <div class="studio-card">
+      <div class="studio-card__title">${COPY.profileTitleInline}</div>
+      <div class="studio-card__desc">${COPY.profileDescription}</div>
+      <div class="studio-card__form-fields">
+        <label class="studio-card__field">
+          <span class="studio-card__field-label">Name</span>
+          <input
+            type="text"
+            class="studio-card__input"
+            placeholder="Your name"
+            .value=${nameValue}
+            @input=${(e: InputEvent) =>
+              state.onFormValueChange("profile-displayName", (e.target as HTMLInputElement).value)}
+          />
+        </label>
+        <label class="studio-card__field">
+          <span class="studio-card__field-label">Studio <span class="studio-card__optional">(optional)</span></span>
+          <input
+            type="text"
+            class="studio-card__input"
+            placeholder="Studio name"
+            .value=${studioValue}
+            @input=${(e: InputEvent) =>
+              state.onFormValueChange("profile-studioName", (e.target as HTMLInputElement).value)}
+          />
+        </label>
+        <label class="studio-card__field">
+          <span class="studio-card__field-label">Website <span class="studio-card__optional">(optional)</span></span>
+          <input
+            type="text"
+            class="studio-card__input"
+            placeholder="yoursite.com"
+            .value=${websiteValue}
+            @input=${(e: InputEvent) =>
+              state.onFormValueChange("profile-website", (e.target as HTMLInputElement).value)}
+          />
+        </label>
+      </div>
+      <div class="studio-card__actions">
+        <button
+          class="btn primary"
+          ?disabled=${!state.connected || !nameValue.trim()}
+          @click=${() => state.onAction("save-profile-inline")}
+        >Save</button>
+        <button
+          class="btn"
+          ?disabled=${!state.connected}
+          @click=${() => state.onAction("skip-profile-setup")}
+        >${COPY.profileNotNow}</button>
       </div>
     </div>
   `;
@@ -459,33 +521,107 @@ function renderImportCard(card: ImportCard, state: StudioManagerViewState) {
   `;
 }
 
-function renderStageProgressCard(card: StageProgressCard) {
+function renderProtectionChip(chip: ProtectionChip) {
+  const iconMap = {
+    pending: "\u25CB",
+    active: "\u2026",
+    done: "\u2713",
+    error: "\u2717",
+  };
   return html`
-    <div class="studio-card studio-card--status">
-      <div class="studio-stages">
+    <span class="ingest-protection__chip ingest-protection__chip--${chip.status}">
+      <span class="ingest-protection__icon">${iconMap[chip.status]}</span>
+      ${chip.label}
+    </span>
+  `;
+}
+
+function renderStageProgressCard(card: StageProgressCard) {
+  const percent = Math.max(0, Math.min(100, card.currentStageProgress));
+  const stageMode = card.activeStageId ?? "copy";
+
+  return html`
+    <div class="studio-card studio-card--ingest">
+      <!-- Stage stepper -->
+      <div class="ingest-stepper">
         ${card.stages.map(
-          (stage) => html`
-            <div class="studio-stage studio-stage--${stage.status}">
-              <span class="studio-stage__icon">
-                ${stage.status === "done" ? "\u2713" : stage.status === "active" ? "\u25C9" : "\u25CB"}
-              </span>
-              <span>${stage.label}</span>
-            </div>
+          (stage, i) => html`
             ${
-              stage.status === "active" && card.currentStageProgress > 0
+              i > 0
                 ? html`
-                  <div class="studio-card__progress-track">
-                    <div
-                      class="studio-card__progress-fill"
-                      style="width: ${Math.min(100, card.currentStageProgress)}%"
-                    ></div>
-                  </div>
-                `
+                <div class="ingest-stepper__connector">
+                  <div
+                    class="ingest-stepper__connector-fill"
+                    style="width: ${stage.status === "done" || stage.status === "active" ? "100" : "0"}%"
+                  ></div>
+                </div>
+              `
                 : nothing
             }
+            <div class="ingest-stepper__step ingest-stepper__step--${stage.status}">
+              <div class="ingest-stepper__orb ingest-stepper__orb--${stage.status}">
+                ${
+                  stage.status === "done"
+                    ? html`
+                        <span class="ingest-stepper__check">\u2713</span>
+                      `
+                    : String(i + 1)
+                }
+              </div>
+              <div class="ingest-stepper__label">${stage.label}</div>
+            </div>
           `,
         )}
       </div>
+
+      <!-- Protection Stack -->
+      ${
+        card.protectionStack && card.protectionStack.length > 0
+          ? html`
+          <div class="ingest-protection">
+            ${card.protectionStack.map((chip) => renderProtectionChip(chip))}
+          </div>
+        `
+          : nothing
+      }
+
+      <!-- Progress bar -->
+      <div class="ingest-progress ingest-progress--${stageMode}">
+        <div class="ingest-progress__fill" style="width: ${percent}%"></div>
+        <div class="ingest-progress__glow" style="width: ${percent}%"></div>
+      </div>
+
+      <!-- File ticker -->
+      ${
+        card.currentFileName
+          ? html`
+          <div class="ingest-ticker">
+            <span class="ingest-ticker__file" .key=${card.currentFileName}>
+              ${stageMode === "verify" ? `Checking ${card.currentFileName}` : card.currentFileName}
+            </span>
+          </div>
+        `
+          : nothing
+      }
+
+      <!-- Counters -->
+      ${
+        card.filesTotal && card.filesTotal > 0
+          ? html`
+          <div class="ingest-counters">
+            <div class="ingest-counter">
+              <div>
+                <span class="ingest-counter__value">${card.filesCopied ?? 0}</span>
+                <span class="ingest-counter__total"> / ${card.filesTotal}</span>
+              </div>
+              <div class="ingest-counter__label">photos</div>
+            </div>
+          </div>
+        `
+          : nothing
+      }
+
+      <!-- Status line -->
       <div class="studio-card__desc">${card.statusLine}</div>
     </div>
   `;
@@ -536,6 +672,8 @@ export function renderStudioManager(state: StudioManagerViewState) {
               return renderTemplatePickerCard(entry, state);
             case "import":
               return renderImportCard(entry, state);
+            case "profile-form":
+              return renderProfileFormCard(entry, state);
             case "stage-progress":
               return renderStageProgressCard(entry);
           }

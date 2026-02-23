@@ -114,6 +114,14 @@ export const COPY = {
   stageVerifying: "Verifying",
   stageFinalizing: "Finalizing report",
 
+  // File ticker / progress detail
+  tickerScanning: (count: number) => `${count} photos found`,
+  tickerCopying: (current: number, total: number) => `${current} of ${total} photos`,
+  tickerBackingUp: (current: number, total: number) => `Backing up ${current} of ${total}`,
+  tickerVerifying: (current: number, total: number) => `Checking ${current} of ${total}`,
+  tickerWritingReport: "Writing Safety Report\u2026",
+  tickerAllDone: "All done!",
+
   // Completion badges
   completionHeadline: "Import complete",
   completionCopies: (n: number) => `${n} ${n === 1 ? "copy" : "copies"} created`,

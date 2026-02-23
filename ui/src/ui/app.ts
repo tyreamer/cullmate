@@ -187,7 +187,7 @@ export class OpenClawApp extends LitElement {
   @state() ingestResult: IngestResult | null = null;
   @state() ingestError: string | null = null;
   @state() ingestRunId: string | null = null;
-  @state() ingestVerifyMode: "none" | "sentinel" = "none";
+  @state() ingestVerifyMode: "none" | "sentinel" | "full" = "none";
   @state() ingestDedupeEnabled = false;
   @state() ingestRecentProjects: RecentProject[] = [];
   @state() ingestSuggestedSources: SuggestedSource[] = [];
@@ -1014,6 +1014,50 @@ export class OpenClawApp extends LitElement {
       }
     }
 
+    // Build protection stack from current pipeline state
+    const protectionStack: import("./controllers/studio-manager.ts").ProtectionChip[] = [];
+
+    // Primary copy chip
+    if (copyStatus === "done" || verifyStatus !== "pending" || finalizeStatus !== "pending") {
+      protectionStack.push({ label: "Primary copy", status: "done" });
+    } else if (copyStatus === "active" && !p.type.startsWith("ingest.backup")) {
+      protectionStack.push({ label: "Primary copy", status: "active" });
+    } else {
+      protectionStack.push({ label: "Primary copy", status: "pending" });
+    }
+
+    // Backup copy chip (only if backup events have been seen or we're past copy)
+    if (
+      p.type.startsWith("ingest.backup") ||
+      verifyStatus !== "pending" ||
+      finalizeStatus !== "pending"
+    ) {
+      if (verifyStatus !== "pending" || finalizeStatus !== "pending") {
+        protectionStack.push({ label: "Backup copy", status: "done" });
+      } else if (p.type.startsWith("ingest.backup")) {
+        protectionStack.push({ label: "Backup copy", status: "active" });
+      } else {
+        protectionStack.push({ label: "Backup copy", status: "pending" });
+      }
+    }
+
+    // Verification chip
+    if (verifyStatus === "done" || finalizeStatus !== "pending") {
+      protectionStack.push({ label: "Verification", status: "done" });
+    } else if (verifyStatus === "active") {
+      protectionStack.push({ label: "Verification", status: "active" });
+    } else {
+      protectionStack.push({ label: "Verification", status: "pending" });
+    }
+
+    // Determine active stage ID for bar styling
+    const activeStageId =
+      finalizeStatus === "active" || finalizeStatus === "done"
+        ? "finalize"
+        : verifyStatus === "active"
+          ? "verify"
+          : "copy";
+
     const updated = [...this.studioTimeline];
     updated[progressIndex] = {
       kind: "stage-progress" as const,
@@ -1027,6 +1071,12 @@ export class OpenClawApp extends LitElement {
       ],
       currentStageProgress: stageProgress,
       statusLine,
+      activeStageId,
+      currentFileName: p.rel_path ? p.rel_path.split("/").pop() : undefined,
+      filesCopied: p.index ?? 0,
+      filesTotal: p.total ?? 0,
+      bytesCopied: p.total_bytes_copied ?? p.bytes_copied,
+      protectionStack,
     };
     this.studioTimeline = updated;
   }
@@ -1247,6 +1297,18 @@ export class OpenClawApp extends LitElement {
     if (this.ingestStage === "prompting") {
       this.ingestDestPath = cfg.primaryDest;
     }
+    // Update import card in the timeline if it exists
+    const importCard = this.studioTimeline.find((e) => e.kind === "import");
+    if (importCard && importCard.kind === "import") {
+      const updated = this.studioTimeline.map((e) =>
+        e.kind === "import"
+          ? { ...e, saveTo: cfg.primaryDest, saveToLabel: formatPathLabel(cfg.primaryDest) }
+          : e,
+      );
+      this.studioTimeline = updated;
+    } else {
+      this.rebuildStudioTimeline();
+    }
     this.scheduleSettingsSync();
   }
 
@@ -1254,6 +1316,7 @@ export class OpenClawApp extends LitElement {
     this.studioProfile = profile;
     this.isStudioProfileOpen = false;
     this.scheduleSettingsSync();
+    this.rebuildStudioTimeline();
   }
 
   async handleExportDiagnostics() {
@@ -1372,6 +1435,27 @@ export class OpenClawApp extends LitElement {
       case "edit-profile":
         this.isStudioProfileOpen = true;
         break;
+      case "save-profile-inline": {
+        const displayName = (this.studioFormValues["profile-displayName"] ?? "").trim();
+        if (!displayName) {
+          break;
+        }
+        const studioName = (this.studioFormValues["profile-studioName"] ?? "").trim();
+        const website = (this.studioFormValues["profile-website"] ?? "").trim();
+        const year = new Date().getFullYear();
+        const profile = {
+          ...this.studioProfile,
+          enabled: true,
+          displayName,
+          studioName,
+          website,
+          copyrightLine: `\u00A9 ${year} ${displayName}`,
+          completedSetup: true,
+        };
+        this.handleSaveStudioProfile(profile);
+        this.rebuildStudioTimeline();
+        break;
+      }
       case "skip-profile-setup":
         this.studioProfile = {
           ...this.studioProfile,
@@ -1413,8 +1497,7 @@ export class OpenClawApp extends LitElement {
               projectName: "",
               saveTo: destPath,
               saveToLabel: formatPathLabel(destPath),
-              verifyMode:
-                (this.settings.defaultVerifyMode as "none" | "sentinel" | "full") || "sentinel",
+              verifyMode: this.settings.defaultVerifyMode || "sentinel",
               dedupeEnabled: false,
               folderTemplateName: this.folderTemplate?.name || "Classic",
             });
@@ -1445,8 +1528,7 @@ export class OpenClawApp extends LitElement {
                 projectName: smartName,
                 saveTo: destPath,
                 saveToLabel: formatPathLabel(destPath),
-                verifyMode:
-                  (this.settings.defaultVerifyMode as "none" | "sentinel" | "full") || "sentinel",
+                verifyMode: this.settings.defaultVerifyMode || "sentinel",
                 dedupeEnabled: false,
                 folderTemplateName: this.folderTemplate?.name || "Classic",
               });
@@ -1575,6 +1657,11 @@ export class OpenClawApp extends LitElement {
         ],
         currentStageProgress: 0,
         statusLine: COPY.statusScanning,
+        activeStageId: "copy",
+        protectionStack: [
+          { label: "Primary copy", status: "active" as const },
+          { label: "Verification", status: "pending" as const },
+        ],
       },
     ];
 
@@ -1747,10 +1834,7 @@ export class OpenClawApp extends LitElement {
 
     // Read import card settings if present
     const importCard = this.studioTimeline.find((e) => e.kind === "import");
-    const verifyMode =
-      importCard?.verifyMode ??
-      (this.settings.defaultVerifyMode as "none" | "sentinel" | "full") ??
-      "sentinel";
+    const verifyMode = importCard?.verifyMode ?? this.settings.defaultVerifyMode ?? "sentinel";
     const dedupeEnabled = importCard?.dedupeEnabled ?? false;
 
     // Replace the action cards with a stage progress card
@@ -1773,6 +1857,11 @@ export class OpenClawApp extends LitElement {
         ],
         currentStageProgress: 0,
         statusLine: COPY.statusScanning,
+        activeStageId: "copy",
+        protectionStack: [
+          { label: "Primary copy", status: "active" as const },
+          { label: "Verification", status: "pending" as const },
+        ],
       },
     ];
 

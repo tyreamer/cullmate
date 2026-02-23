@@ -486,39 +486,352 @@
   cursor: pointer;
 }
 
-/* ── Stage progress ── */
+/* ── Premium Ingest Progress ── */
 
-.studio-stages {
+/* Keyframes */
+
+@keyframes stage-orb-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow), 0 0 8px var(--accent-glow); }
+  50% { box-shadow: 0 0 0 6px transparent, 0 0 16px var(--accent-glow); }
+}
+
+@keyframes stage-check-pop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes progress-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+@keyframes ticker-slide-in {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes completion-burst {
+  0% { box-shadow: 0 0 0 0 var(--ok-muted); }
+  50% { box-shadow: 0 0 20px 4px var(--ok-subtle); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+@keyframes result-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes result-safe-glow {
+  0% { box-shadow: 0 0 0 0 var(--ok-muted); }
+  40% { box-shadow: 0 0 16px 2px var(--ok-subtle); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Ingest card container */
+
+.studio-card--ingest {
+  gap: 16px;
+}
+
+/* Stage stepper */
+
+.ingest-stepper {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0;
+  padding: 8px 0 4px;
+}
+
+.ingest-stepper__step {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
-.studio-stage {
+.ingest-stepper__orb {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  color: var(--muted);
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  transition: all 0.4s var(--ease-out);
+  flex-shrink: 0;
 }
 
-.studio-stage--active {
+.ingest-stepper__orb--pending {
+  border: 2px solid var(--border-strong);
+  color: var(--muted);
+  background: transparent;
+}
+
+.ingest-stepper__orb--active {
+  border: 2px solid var(--accent);
+  color: var(--accent);
+  background: var(--accent-subtle);
+  animation: stage-orb-pulse 2s ease-in-out infinite;
+}
+
+.ingest-stepper__orb--done {
+  border: 2px solid var(--ok);
+  color: white;
+  background: var(--ok);
+  animation: completion-burst 0.6s var(--ease-out);
+}
+
+.ingest-stepper__orb--done .ingest-stepper__check {
+  animation: stage-check-pop 0.4s var(--ease-spring) backwards;
+  animation-delay: 0.1s;
+}
+
+.ingest-stepper__connector {
+  flex: 1;
+  height: 2px;
+  background: var(--border);
+  position: relative;
+  overflow: hidden;
+  margin-top: 14px;
+  min-width: 32px;
+}
+
+.ingest-stepper__connector-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--ok), var(--accent));
+  transition: width 0.6s var(--ease-out);
+}
+
+.ingest-stepper__label {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  letter-spacing: 0.02em;
+  transition: color 0.3s var(--ease-out);
+}
+
+.ingest-stepper__step--active .ingest-stepper__label {
   color: var(--text-strong);
   font-weight: 500;
 }
 
-.studio-stage--done {
+.ingest-stepper__step--done .ingest-stepper__label {
   color: var(--ok);
 }
 
-.studio-stage__icon {
-  width: 20px;
-  text-align: center;
-  flex-shrink: 0;
+/* Protection Stack */
+
+.ingest-protection {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 4px 0;
 }
 
-.studio-stage--active .studio-stage__icon {
-  animation: pulse-subtle 1.5s ease-in-out infinite;
+.ingest-protection__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: all 0.4s var(--ease-out);
+}
+
+.ingest-protection__chip--pending {
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: transparent;
+}
+
+.ingest-protection__chip--active {
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.ingest-protection__chip--done {
+  border: 1px solid var(--ok);
+  color: white;
+  background: var(--ok);
+  animation: completion-burst 0.5s var(--ease-out);
+}
+
+.ingest-protection__chip--error {
+  border: 1px solid var(--danger);
+  color: white;
+  background: var(--danger);
+}
+
+.ingest-protection__icon {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.ingest-protection__chip--done .ingest-protection__icon {
+  animation: stage-check-pop 0.3s var(--ease-spring) backwards;
+  animation-delay: 0.05s;
+}
+
+/* Progress bar (stage-aware) */
+
+.ingest-progress {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  background: var(--bg-hover);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ingest-progress__fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+  transition: width 0.4s var(--ease-out), background 0.6s var(--ease-out);
+  position: relative;
+}
+
+/* Shimmer — only active during copy stage */
+.ingest-progress__fill::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  animation: progress-shimmer 2s ease-in-out infinite;
+  transition: opacity 0.4s var(--ease-out);
+}
+
+/* Verify mode: kill shimmer, tighten glow */
+.ingest-progress--verify .ingest-progress__fill::after {
+  opacity: 0;
+  animation: none;
+}
+
+.ingest-progress--verify .ingest-progress__fill {
+  background: linear-gradient(90deg, var(--accent), var(--accent));
+}
+
+/* Finalize mode: no shimmer, steady */
+.ingest-progress--finalize .ingest-progress__fill::after {
+  opacity: 0;
+  animation: none;
+}
+
+.ingest-progress__glow {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 0;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: 0 0 12px var(--accent-glow), 0 0 4px var(--accent-glow);
+  transition: width 0.4s var(--ease-out), box-shadow 0.6s var(--ease-out);
+  pointer-events: none;
+}
+
+/* Verify mode: tighter, whiter glow */
+.ingest-progress--verify .ingest-progress__glow {
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.15), 0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+.ingest-progress--finalize .ingest-progress__glow {
+  box-shadow: none;
+}
+
+/* File ticker */
+
+.ingest-ticker {
+  height: 20px;
+  overflow: hidden;
+  position: relative;
+}
+
+.ingest-ticker__file {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--mono);
+  letter-spacing: 0.01em;
+  animation: ticker-slide-in 0.3s var(--ease-out);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+/* Counters */
+
+.ingest-counters {
+  display: flex;
+  gap: 24px;
+}
+
+.ingest-counter__value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  transition: color 0.3s var(--ease-out);
+}
+
+.ingest-counter__total {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.ingest-counter__label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 2px;
+}
+
+/* Result card entrance animation */
+
+.studio-card--result-enter {
+  animation: result-rise 0.6s var(--ease-out) backwards;
+}
+
+.studio-card--result-safe-enter {
+  animation: result-rise 0.6s var(--ease-out) backwards, result-safe-glow 0.8s var(--ease-out) 0.3s backwards;
+}
+
+/* Reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  .ingest-stepper__orb--active,
+  .ingest-stepper__orb--done,
+  .ingest-protection__chip--done,
+  .ingest-protection__chip--done .ingest-protection__icon,
+  .ingest-stepper__orb--done .ingest-stepper__check,
+  .ingest-progress__fill::after,
+  .ingest-ticker__file,
+  .studio-card--result-enter,
+  .studio-card--result-safe-enter {
+    animation: none !important;
+  }
+
+  .ingest-stepper__connector-fill,
+  .ingest-progress__fill,
+  .ingest-progress__glow,
+  .ingest-protection__chip {
+    transition-duration: 0.01s !important;
+  }
 }
 
 /* ── Result badges ── */

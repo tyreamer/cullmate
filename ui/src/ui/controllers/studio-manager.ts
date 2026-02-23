@@ -91,6 +91,11 @@ export type ImportCard = {
   folderTemplateName: string;
 };
 
+export type ProtectionChip = {
+  label: string;
+  status: "pending" | "active" | "done" | "error";
+};
+
 export type StageProgressCard = {
   kind: "stage-progress";
   id: string;
@@ -99,6 +104,18 @@ export type StageProgressCard = {
   stages: Array<{ id: string; label: string; status: "pending" | "active" | "done" }>;
   currentStageProgress: number;
   statusLine: string;
+  activeStageId?: string;
+  currentFileName?: string;
+  filesCopied?: number;
+  filesTotal?: number;
+  bytesCopied?: number;
+  protectionStack?: ProtectionChip[];
+};
+
+export type ProfileFormCard = {
+  kind: "profile-form";
+  id: string;
+  role: "baxbot";
 };
 
 export type TimelineEntry =
@@ -109,7 +126,8 @@ export type TimelineEntry =
   | FormCard
   | TemplatePickerCard
   | ImportCard
-  | StageProgressCard;
+  | StageProgressCard
+  | ProfileFormCard;
 
 // ── Builder ──
 
@@ -192,13 +210,9 @@ export function buildStarterTimeline(opts: {
         body: COPY.profilePromptInline,
       },
       {
-        kind: "action",
+        kind: "profile-form",
         id: "setup-profile",
         role: "baxbot",
-        title: COPY.profileTitleInline,
-        description: COPY.profileDescription,
-        primaryButton: { label: COPY.profileTurnOn, action: "open-profile-setup" },
-        secondaryButtons: [{ label: COPY.profileNotNow, action: "skip-profile-setup" }],
       },
     ];
   }
