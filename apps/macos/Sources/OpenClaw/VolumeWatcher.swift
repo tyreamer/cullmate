@@ -33,7 +33,7 @@ final class VolumeWatcher {
 
         let watcher = CoalescingFSEventsWatcher(
             paths: ["/Volumes"],
-            queueLabel: "ai.openclaw.volume-watcher",
+            queueLabel: "ai.baxbot.volume-watcher",
             coalesceDelay: 1.5 // Volumes need time to fully mount
         ) { [weak self] in
             Task { @MainActor in
