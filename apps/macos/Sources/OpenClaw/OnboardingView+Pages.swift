@@ -37,39 +37,57 @@ extension OnboardingView {
 
     func welcomePage() -> some View {
         self.onboardingPage {
-            VStack(spacing: 22) {
+            VStack(spacing: 18) {
                 Text("Welcome to BaxBot")
                     .font(.largeTitle.weight(.semibold))
-                Text("BaxBot keeps your weddings safe and organized \u{2014} on this Mac.")
+                Text("Keeps your shoots safe, organized, and ready to edit \u{2014} on this Mac.")
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
-                    .frame(maxWidth: 560)
+                    .frame(maxWidth: 520)
                     .fixedSize(horizontal: false, vertical: true)
 
-                self.onboardingCard(spacing: 10, padding: 14) {
-                    HStack(alignment: .top, spacing: 12) {
-                        Image(systemName: "lock.fill")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(Color.accentColor)
-                            .frame(width: 22)
-                            .padding(.top, 1)
+                VStack(spacing: 10) {
+                    self.onboardingCard(spacing: 8, padding: 14) {
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "macbook")
+                                .font(.title3)
+                                .foregroundStyle(Color.accentColor)
+                                .frame(width: 24)
+                                .padding(.top, 1)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Private on this Mac")
+                                    .font(.headline)
+                                Text("Nothing uploads unless you export or share.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
 
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Runs locally")
-                                .font(.headline)
-                            Text(
-                                "Everything stays on this Mac. Nothing uploads unless you export.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                    self.onboardingCard(spacing: 8, padding: 14) {
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "checkmark.shield")
+                                .font(.title3)
+                                .foregroundStyle(Color.accentColor)
+                                .frame(width: 24)
+                                .padding(.top, 1)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Verified copies + receipt")
+                                    .font(.headline)
+                                Text("Creates a second copy and a \u{201C}safe to format\u{201D} report.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                     }
                 }
                 .frame(maxWidth: 520)
             }
-            .padding(.top, 16)
+            .padding(.top, 4)
         }
     }
 
@@ -844,23 +862,16 @@ extension OnboardingView {
         self.onboardingPage {
             Text("You\u{2019}re all set")
                 .font(.largeTitle.weight(.semibold))
-            Text("Insert a card to begin.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 520)
-                .fixedSize(horizontal: false, vertical: true)
-
             self.onboardingCard(spacing: 12, padding: 16) {
                 HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "menubar.arrow.up.rectangle")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 28)
+                    Image(nsImage: CritterIconRenderer.makeIcon(blink: 0))
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 28, height: 28)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("BaxBot lives in your menu bar")
                             .font(.headline)
-                        Text("Look for the little character in the top-right of your screen. Left-click it to open the Studio Manager.")
+                        Text("Look for this little character in the top-right of your screen. Left-click it to open the Studio Manager.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -895,20 +906,26 @@ extension OnboardingView {
                     }
             }
         }
+        .task {
+            if !self.state.launchAtLogin {
+                self.state.launchAtLogin = true
+                AppStateStore.updateLaunchAtLogin(enabled: true)
+            }
+        }
     }
 
     func gatewaySetupPage() -> some View {
         self.onboardingPage {
-            Spacer().frame(height: 40)
+            Spacer().frame(height: 20)
 
             if self.gatewaySetupDone {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 48))
-                    .foregroundStyle(.green)
-                    .transition(.scale.combined(with: .opacity))
+                BaxBotSetupLoader(done: true, failed: false)
+                    .frame(width: 160, height: 160)
+                    .padding(.bottom, 4)
                 Text("BaxBot is ready")
                     .font(.largeTitle.weight(.semibold))
-                Text("Opening Studio Manager…")
+                    .transition(.opacity)
+                Text("Opening Studio Manager\u{2026}")
                     .font(.body)
                     .foregroundStyle(.secondary)
             } else if self.gatewaySetupFailed {
@@ -925,15 +942,15 @@ extension OnboardingView {
 
                 Button("Try Again") {
                     self.gatewaySetupFailed = false
-                    self.gatewaySetupStatus = "Starting BaxBot…"
+                    self.gatewaySetupStatus = "Starting BaxBot\u{2026}"
                     Task { await self.runGatewaySetup() }
                 }
                 .buttonStyle(.borderedProminent)
                 .padding(.top, 8)
             } else {
-                ProgressView()
-                    .controlSize(.large)
-                    .padding(.bottom, 8)
+                BaxBotSetupLoader(done: false, failed: false)
+                    .frame(width: 160, height: 160)
+                    .padding(.bottom, 4)
                 Text("Setting up BaxBot")
                     .font(.largeTitle.weight(.semibold))
                 Text(self.gatewaySetupStatus)
@@ -941,12 +958,12 @@ extension OnboardingView {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 420)
-                    .animation(.easeInOut(duration: 0.2), value: self.gatewaySetupStatus)
+                    .contentTransition(.opacity)
+                    .animation(.easeInOut(duration: 0.4), value: self.gatewaySetupStatus)
             }
         }
-        .task {
-            await self.runGatewaySetup()
-        }
+        // Gateway setup is triggered by handleNext() when the user navigates here,
+        // NOT by .task {} (all pages are pre-rendered so .task fires immediately).
     }
 
     private var skillsOverview: some View {

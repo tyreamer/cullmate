@@ -62,7 +62,12 @@ enum GatewayLaunchAgentManager {
         }
 
         if enabled {
-            self.logger.info("launchd enable requested via CLI port=\(port)")
+            // Start: try direct launchctl first (zero CLI dependency), fall back to CLI install.
+            let directStart = await self.startDirect()
+            if directStart == nil {
+                return nil
+            }
+            self.logger.info("direct launchctl start failed, trying CLI install port=\(port)")
             return await self.runDaemonCommand([
                 "install",
                 "--force",
@@ -73,12 +78,85 @@ enum GatewayLaunchAgentManager {
             ])
         }
 
-        self.logger.info("launchd disable requested via CLI")
+        // Stop: use direct launchctl (zero CLI dependency), fall back to CLI uninstall.
+        self.logger.info("launchd disable requested")
+        let directResult = await self.stopDirect()
+        if directResult == nil {
+            return nil
+        }
+        self.logger.info("direct launchctl stop failed, trying CLI uninstall")
         return await self.runDaemonCommand(["uninstall"])
     }
 
     static func kickstart() async {
         _ = await self.runDaemonCommand(["restart"], timeout: 20)
+    }
+
+    // MARK: - Direct launchctl (no CLI dependency)
+
+    private static var guiDomain: String {
+        "gui/\(getuid())"
+    }
+
+    private static var serviceTarget: String {
+        "\(self.guiDomain)/\(gatewayLaunchdLabel)"
+    }
+
+    /// Stop the gateway using launchctl directly — no CLI binary needed.
+    static func stopDirect() async -> String? {
+        let plist = self.plistURL.path
+        let target = self.serviceTarget
+
+        // bootout removes the service from launchd (sends SIGTERM to the process).
+        let bootout = await Launchctl.run(["bootout", target])
+        if bootout.status == 0 {
+            self.logger.info("gateway stopped via launchctl bootout")
+            return nil
+        }
+
+        // If bootout failed, try unload (legacy but still works).
+        if FileManager().fileExists(atPath: plist) {
+            let unload = await Launchctl.run(["unload", plist])
+            if unload.status == 0 {
+                self.logger.info("gateway stopped via launchctl unload")
+                return nil
+            }
+        }
+
+        let msg = "launchctl bootout failed (status \(bootout.status)): \(bootout.output)"
+        self.logger.warning("\(msg, privacy: .public)")
+        return msg
+    }
+
+    /// Start the gateway using launchctl directly — requires plist already written.
+    static func startDirect() async -> String? {
+        let plist = self.plistURL.path
+        let domain = self.guiDomain
+        let target = self.serviceTarget
+
+        guard FileManager().fileExists(atPath: plist) else {
+            return "Launch agent plist not found at \(plist). Run setup first."
+        }
+
+        // Clear any stale registration.
+        _ = await Launchctl.run(["bootout", target])
+        _ = await Launchctl.run(["unload", plist])
+
+        // Enable + bootstrap + kickstart.
+        _ = await Launchctl.run(["enable", target])
+        let bootstrap = await Launchctl.run(["bootstrap", domain, plist])
+        if bootstrap.status != 0 {
+            let msg = "launchctl bootstrap failed (\(bootstrap.status)): \(bootstrap.output)"
+            self.logger.warning("\(msg, privacy: .public)")
+            return msg
+        }
+        let kick = await Launchctl.run(["kickstart", "-k", target])
+        if kick.status != 0 {
+            self.logger.warning("launchctl kickstart failed (\(kick.status)): \(kick.output)")
+            // bootstrap succeeded so the service should still start via RunAtLoad
+        }
+        self.logger.info("gateway started via direct launchctl")
+        return nil
     }
 
     static func launchdConfigSnapshot() -> LaunchAgentPlistSnapshot? {

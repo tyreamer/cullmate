@@ -64,19 +64,18 @@ extension OnboardingView {
         if self.isWizardBlocking { return }
         if self.currentPage < self.pageCount - 1 {
             withAnimation { self.currentPage += 1 }
+            // Start gateway setup when the user navigates to the setup page (page 12).
+            // We trigger here instead of .task {} because all pages are pre-rendered in an HStack,
+            // so .task fires immediately on app launch rather than when the page is visible.
+            if self.activePageIndex == 12 {
+                Task { await self.runGatewaySetup() }
+            }
         } else {
             self.finish()
         }
     }
 
     func finish() {
-        // Persist storage config to UserDefaults (BaxBot-specific, not the gateway config file).
-        if !self.storagePrimaryDest.isEmpty {
-            UserDefaults.standard.set(self.storagePrimaryDest, forKey: "baxbot.photo.primaryDest")
-        }
-        if !self.storageBackupDest.isEmpty {
-            UserDefaults.standard.set(self.storageBackupDest, forKey: "baxbot.photo.backupDest")
-        }
         UserDefaults.standard.set(true, forKey: "openclaw.onboardingSeen")
         UserDefaults.standard.set(currentOnboardingVersion, forKey: onboardingVersionKey)
 
@@ -108,66 +107,97 @@ extension OnboardingView {
     func runGatewaySetup() async {
         self.gatewaySetupDone = false
         self.gatewaySetupFailed = false
-        self.gatewaySetupStatus = "Starting BaxBot…"
+        self.gatewaySetupStatus = "Starting BaxBot\u{2026}"
 
         // 1. Activate the gateway process manager.
         GatewayProcessManager.shared.setActive(true)
-        self.gatewaySetupStatus = "Installing gateway service…"
 
-        // 2. Poll until the gateway is healthy (up to 90 seconds for npm install).
-        let deadline = Date().addingTimeInterval(90)
+        // 2. Poll until the gateway is healthy (up to 60 seconds).
+        let startTime = Date()
+        let deadline = startTime.addingTimeInterval(60)
         var lastStatus = GatewayProcessManager.shared.status
+        var directProbeSucceeded = false
+
         while Date() < deadline {
             let status = GatewayProcessManager.shared.status
+            let elapsed = Date().timeIntervalSince(startTime)
+
+            // Primary check: process manager reports healthy.
             switch status {
             case .running, .attachedExisting:
-                // Gateway is up — verify health endpoint.
-                withAnimation { self.gatewaySetupStatus = "Almost ready…" }
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                withAnimation {
-                    self.gatewaySetupDone = true
-                }
-                // Auto-close after a brief pause to show the checkmark.
-                try? await Task.sleep(nanoseconds: 1_200_000_000)
-                self.finish()
+                await self.completeSetup()
                 return
-            case .failed:
-                // The process manager gave up, but the gateway may still be booting
-                // after a launchd restart. Keep polling instead of giving up immediately.
-                let elapsed = Date().timeIntervalSince(deadline.addingTimeInterval(-90))
-                if elapsed > 60 {
-                    withAnimation {
-                        self.gatewaySetupStatus = "Setup is taking longer than expected."
-                        self.gatewaySetupFailed = true
-                    }
+            default:
+                break
+            }
+
+            // Fallback: direct health probe on the port (catches label mismatches,
+            // already-running gateways the process manager can't see, etc.).
+            if !directProbeSucceeded {
+                let port = GatewayEnvironment.gatewayPort()
+                if await self.probeGatewayHealth(port: port) {
+                    directProbeSucceeded = true
+                    // Tell the process manager to latch on.
+                    GatewayProcessManager.shared.setActive(true)
+                    await self.completeSetup()
                     return
                 }
-                self.gatewaySetupStatus = "Waiting for gateway…"
-                // Retry activation — the process manager may have timed out prematurely.
+            }
+
+            // Update status message (no jargon).
+            if elapsed > 25 {
+                self.gatewaySetupStatus = "Almost there\u{2026}"
+            } else if elapsed > 10 {
+                self.gatewaySetupStatus = "Preparing BaxBot\u{2026}"
+            }
+
+            // Retry activation on failure/stop.
+            switch status {
+            case .failed:
                 GatewayProcessManager.shared.setActive(true)
-            case .starting:
-                // Update status message based on elapsed time.
-                let elapsed = Date().timeIntervalSince(deadline.addingTimeInterval(-90))
-                if elapsed > 30 {
-                    self.gatewaySetupStatus = "Still setting up — this only happens once…"
-                } else if elapsed > 10 {
-                    self.gatewaySetupStatus = "Installing gateway service…"
-                }
             case .stopped:
-                // Retry activation if it stopped unexpectedly.
                 if lastStatus != .stopped {
                     GatewayProcessManager.shared.setActive(true)
                 }
+            default:
+                break
             }
+
             lastStatus = status
             try? await Task.sleep(nanoseconds: 800_000_000)
         }
 
         // Timeout.
         withAnimation {
-            self.gatewaySetupStatus = "Setup is taking longer than expected. Check your internet connection and try again."
+            self.gatewaySetupStatus = "BaxBot is taking longer than expected to start. Try clicking \u{201C}Try Again\u{201D}."
             self.gatewaySetupFailed = true
         }
+    }
+
+    @MainActor
+    private func completeSetup() async {
+        withAnimation { self.gatewaySetupStatus = "Almost ready\u{2026}" }
+        try? await Task.sleep(nanoseconds: 400_000_000)
+        withAnimation { self.gatewaySetupDone = true }
+        try? await Task.sleep(nanoseconds: 1_200_000_000)
+        self.finish()
+    }
+
+    /// Direct HTTP health probe — bypasses GatewayProcessManager and launchd labels.
+    private func probeGatewayHealth(port: Int) async -> Bool {
+        guard let url = URL(string: "http://127.0.0.1:\(port)/") else { return false }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 2
+        request.httpMethod = "GET"
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, http.statusCode == 200 {
+                return true
+            }
+        } catch {
+            // Not reachable yet.
+        }
+        return false
     }
 
     func pickStorageFolder() {

@@ -146,8 +146,9 @@ struct OnboardingView: View {
                 return showOnboardingChat ? [0, 1, 3, 5, 8, 9] : [0, 1, 3, 5, 9]
             }
         }
-        // Photographer mode: Welcome → Storage Setup → Ready → Setting Up
-        return [0, 10, 11, 12]
+        // Photographer mode: Welcome → Ready → Setting Up
+        // Storage is configured in the web UI (Studio Manager) after first launch.
+        return [0, 11, 12]
     }
 
     var showOnboardingChat: Bool {
@@ -169,7 +170,7 @@ struct OnboardingView: View {
     var buttonTitle: String {
         if self.activePageIndex == 11 { return "Get Started" }
         if self.currentPage == self.pageCount - 1 { return "Finish" }
-        return "Next"
+        return "Continue"
     }
 
     var wizardPageOrderIndex: Int? {
