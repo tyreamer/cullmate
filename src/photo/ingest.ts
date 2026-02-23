@@ -523,6 +523,7 @@ export async function runIngest(
       xmp_failed_count: files.filter((f) => f.sidecar_written === false).length,
       triage_unreadable_count: triageResult.unreadable_count,
       triage_black_frame_count: triageResult.black_frame_count,
+      triage_soft_focus_count: triageResult.soft_focus_count,
     },
     files,
   };

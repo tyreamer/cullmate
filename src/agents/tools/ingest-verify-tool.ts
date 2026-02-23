@@ -141,6 +141,7 @@ export function createIngestVerifyTool(): AnyAgentTool {
         report_path: manifest.report_path,
         safe_to_format: manifest.safe_to_format,
         totals: manifest.totals,
+        hero_picks: manifest.triage?.hero_picks ?? [],
       });
     },
   };

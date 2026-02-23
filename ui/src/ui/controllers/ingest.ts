@@ -66,7 +66,14 @@ export type IngestResult = {
   triage?: {
     unreadable_count: number;
     black_frame_count: number;
+    soft_focus_count: number;
+    hero_picks: Array<{ file: string; score: number }>;
   };
+  bursts?: {
+    burst_count: number;
+    best_pick_count: number;
+  };
+  review_folder?: string;
   totals?: {
     file_count: number;
     success_count: number;
@@ -117,6 +124,20 @@ export async function openPath(
   reveal = false,
 ): Promise<void> {
   await client.request("system.open_path", { path: filePath, allowed_root: allowedRoot, reveal });
+}
+
+export async function openWithEditor(
+  client: GatewayBrowserClient,
+  projectRoot: string,
+  allowedRoot: string,
+  editorHint: string,
+): Promise<void> {
+  await client.request("system.open_path", {
+    path: projectRoot,
+    allowed_root: allowedRoot,
+    reveal: true,
+    editor_hint: editorHint,
+  });
 }
 
 export type PickFolderResult = { ok: true; path: string } | { ok: false; cancelled: true };

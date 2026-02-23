@@ -130,13 +130,35 @@ function renderStatusCard(card: StatusCard) {
   `;
 }
 
+function renderHeroPicks(card: ResultCard) {
+  if (!card.heroPicks || card.heroPicks.length === 0) {
+    return nothing;
+  }
+  return html`
+    <div class="studio-card__hero-picks">
+      <div class="studio-card__hero-picks-title">${COPY.heroPicksTitle}</div>
+      <div class="studio-card__hero-picks-desc">${COPY.heroPicksDescription}</div>
+      <ul class="studio-card__hero-picks-list">
+        ${card.heroPicks.map(
+          (pick) => html`
+            <li class="studio-card__hero-pick">
+              <span class="mono">${pick.file}</span>
+              <span class="studio-card__hero-pick-score">${pick.score}/100</span>
+            </li>
+          `,
+        )}
+      </ul>
+    </div>
+  `;
+}
+
 function renderTriageSummary(card: ResultCard) {
   if (!card.triageSummary) {
     return nothing;
   }
-  const { unreadableCount, blackFrameCount } = card.triageSummary;
+  const { unreadableCount, blackFrameCount, softFocusCount } = card.triageSummary;
 
-  if (unreadableCount === 0 && blackFrameCount === 0) {
+  if (unreadableCount === 0 && blackFrameCount === 0 && softFocusCount === 0) {
     return html`
       <div class="studio-card__triage studio-card__triage--ok">
         \u2713 ${COPY.triageClean}
@@ -160,6 +182,15 @@ function renderTriageSummary(card: ResultCard) {
           ? html`
         <div class="studio-card__triage-info">
           ${COPY.triageBlackFrames(blackFrameCount)}
+        </div>
+      `
+          : nothing
+      }
+      ${
+        softFocusCount > 0
+          ? html`
+        <div class="studio-card__triage-info">
+          ${COPY.triageSoftFocus(softFocusCount)}
         </div>
       `
           : nothing
@@ -236,6 +267,7 @@ function renderResultCard(card: ResultCard, state: StudioManagerViewState) {
           : nothing
       }
       ${renderTriageSummary(card)}
+      ${renderHeroPicks(card)}
       ${renderBurstSummary(card)}
       <div class="studio-card__actions">
         ${card.buttons.map(

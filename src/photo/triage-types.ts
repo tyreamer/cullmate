@@ -1,10 +1,16 @@
-export type TriageFlagKind = "unreadable" | "black_frame";
+export type TriageFlagKind = "unreadable" | "black_frame" | "soft_focus";
 
 export type TriageFlag = {
   kind: TriageFlagKind;
   reason: string;
   confidence: number;
   metric?: number;
+};
+
+export type HeroPick = {
+  file: string;
+  score: number;
+  media_type?: string;
 };
 
 export type TriageFileResult = {
@@ -20,6 +26,8 @@ export type TriageResult = {
   file_count: number;
   unreadable_count: number;
   black_frame_count: number;
+  soft_focus_count: number;
+  hero_picks: HeroPick[];
   flagged_files: TriageFileResult[];
 };
 

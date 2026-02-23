@@ -54,6 +54,105 @@ const EXT_TO_MIME = new Map<string, string[]>([
 ]);
 
 /**
+ * Compute a sharpness score (0-100) for an image using Laplacian variance.
+ * Higher score = sharper image. Returns null if the file can't be decoded.
+ */
+export async function computeSharpnessScore(filePath: string): Promise<number | null> {
+  const ext = path.extname(filePath).toLowerCase();
+  if (!SHARP_DECODABLE.has(ext)) {
+    return null;
+  }
+
+  try {
+    const sharp = await loadSharp();
+    const { data, info } = await sharp(filePath)
+      .resize(128, 128, { fit: "inside" })
+      .grayscale()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    const w = info.width;
+    const h = info.height;
+
+    // Apply 3x3 Laplacian kernel: [0,1,0; 1,-4,1; 0,1,0]
+    // Compute variance of the output
+    let sum = 0;
+    let sumSq = 0;
+    let count = 0;
+
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const center = data[y * w + x];
+        const top = data[(y - 1) * w + x];
+        const bottom = data[(y + 1) * w + x];
+        const left = data[y * w + (x - 1)];
+        const right = data[y * w + (x + 1)];
+
+        const lap = top + bottom + left + right - 4 * center;
+        sum += lap;
+        sumSq += lap * lap;
+        count++;
+      }
+    }
+
+    if (count === 0) {
+      return 0;
+    }
+
+    const mean = sum / count;
+    const variance = sumSq / count - mean * mean;
+
+    // Log-normalize to 0-100 scale
+    // variance ranges from ~0 (flat) to ~10000+ (very sharp)
+    // ln(1) = 0, ln(10001) ≈ 9.21
+    const score = Math.min(100, Math.max(0, (Math.log(1 + variance) / Math.log(10001)) * 100));
+    return Math.round(score * 10) / 10;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if an image is soft-focus by computing sharpness score.
+ * Two-tier detection:
+ * - Score < 15: very likely out of focus (confidence 0.9)
+ * - Score < 25: possibly soft (confidence 0.65)
+ */
+export async function checkSoftFocus(
+  filePath: string,
+  mediaType?: string,
+): Promise<TriageFlag | null> {
+  if (mediaType === "VIDEO") {
+    return null;
+  }
+
+  const score = await computeSharpnessScore(filePath);
+  if (score === null) {
+    return null;
+  }
+
+  if (score < 15) {
+    return {
+      kind: "soft_focus",
+      reason: "Image appears out of focus",
+      confidence: 0.9,
+      metric: score,
+    };
+  }
+
+  if (score < 25) {
+    return {
+      kind: "soft_focus",
+      reason: "Image may be slightly soft",
+      confidence: 0.65,
+      metric: score,
+    };
+  }
+
+  return null;
+}
+
+/**
  * Check if a file's magic bytes indicate a readable format.
  * Returns a TriageFlag if the file appears corrupt/unreadable, null otherwise.
  */

@@ -1,7 +1,12 @@
 import path from "node:path";
-import type { TriageFileResult, TriageParams, TriageResult } from "./triage-types.js";
+import type { HeroPick, TriageFileResult, TriageParams, TriageResult } from "./triage-types.js";
 import type { OnProgress } from "./types.js";
-import { checkBlackFrame, checkCorruption } from "./triage-checks.js";
+import {
+  checkBlackFrame,
+  checkCorruption,
+  checkSoftFocus,
+  computeSharpnessScore,
+} from "./triage-checks.js";
 
 export async function runTriage(
   params: TriageParams,
@@ -14,6 +19,9 @@ export async function runTriage(
   const flaggedFiles: TriageFileResult[] = [];
   let unreadableCount = 0;
   let blackFrameCount = 0;
+  let softFocusCount = 0;
+  /** Track top 5 sharpest images (min-heap by score) */
+  const heroPickCandidates: HeroPick[] = [];
 
   for (let i = 0; i < toAnalyze.length; i++) {
     const entry = toAnalyze[i];
@@ -33,6 +41,31 @@ export async function runTriage(
       if (blackFlag) {
         flags.push(blackFlag);
         blackFrameCount++;
+      }
+    }
+
+    // Sharpness scoring + soft focus detection (only if readable image, not video)
+    if (!corruptionFlag && entry.media_type && entry.media_type !== "VIDEO") {
+      const score = await computeSharpnessScore(absPath);
+      if (score !== null) {
+        entry.sharpness_score = score;
+
+        // Soft focus check
+        const softFlag = await checkSoftFocus(absPath, entry.media_type);
+        if (softFlag) {
+          flags.push(softFlag);
+          softFocusCount++;
+        }
+
+        // Track hero pick candidates (top 5 by score)
+        const pick: HeroPick = { file: entry.src_rel, score, media_type: entry.media_type };
+        if (heroPickCandidates.length < 5) {
+          heroPickCandidates.push(pick);
+          heroPickCandidates.sort((a, b) => b.score - a.score);
+        } else if (score > heroPickCandidates[heroPickCandidates.length - 1].score) {
+          heroPickCandidates[heroPickCandidates.length - 1] = pick;
+          heroPickCandidates.sort((a, b) => b.score - a.score);
+        }
       }
     }
 
@@ -76,6 +109,8 @@ export async function runTriage(
     file_count: toAnalyze.length,
     unreadable_count: unreadableCount,
     black_frame_count: blackFrameCount,
+    soft_focus_count: softFocusCount,
+    hero_picks: heroPickCandidates,
     flagged_files: flaggedFiles,
   };
 
@@ -84,6 +119,7 @@ export async function runTriage(
     type: "ingest.triage.done",
     unreadable_count: unreadableCount,
     black_frame_count: blackFrameCount,
+    soft_focus_count: softFocusCount,
     elapsed_ms: elapsedMs,
   });
 

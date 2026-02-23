@@ -200,13 +200,19 @@ describe("triage integration", () => {
   });
 
   it("clean ingest produces triage with zero flags", async () => {
-    // Source with only valid files
+    // Source with only valid, sharp files (checkerboard pattern creates strong edges)
     const cleanSource = path.join(tmpDir, "source-clean");
     await fs.mkdir(cleanSource, { recursive: true });
 
-    const buf = await sharp({
-      create: { width: 10, height: 10, channels: 3, background: { r: 128, g: 128, b: 128 } },
-    })
+    const size = 128;
+    const pixels = Buffer.alloc(size * size * 3);
+    for (let i = 0; i < pixels.length; i++) {
+      const px = Math.floor(i / 3);
+      const x = px % size;
+      const y = Math.floor(px / size);
+      pixels[i] = (x + y) % 2 === 0 ? 255 : 0;
+    }
+    const buf = await sharp(pixels, { raw: { width: size, height: size, channels: 3 } })
       .jpeg()
       .toBuffer();
     await fs.writeFile(path.join(cleanSource, "good1.jpg"), buf);
@@ -226,9 +232,12 @@ describe("triage integration", () => {
     expect(manifest.triage).toBeDefined();
     expect(manifest.triage!.unreadable_count).toBe(0);
     expect(manifest.triage!.black_frame_count).toBe(0);
-    expect(manifest.triage!.flagged_files).toHaveLength(0);
+    expect(manifest.triage!.soft_focus_count).toBe(0);
+    expect(manifest.triage!.hero_picks.length).toBeGreaterThan(0);
+    expect(manifest.triage!.hero_picks.length).toBeLessThanOrEqual(5);
     expect(manifest.totals.triage_unreadable_count).toBe(0);
     expect(manifest.totals.triage_black_frame_count).toBe(0);
+    expect(manifest.totals.triage_soft_focus_count).toBe(0);
   });
 
   it("emits triage progress events", async () => {

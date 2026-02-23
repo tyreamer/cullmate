@@ -127,6 +127,10 @@ export async function writeProofReport(
   const triageBlackFrames = manifest.files.filter((f) =>
     f.triage_flags?.some((fl) => fl.kind === "black_frame"),
   );
+  const triageSoftFocus = manifest.files.filter((f) =>
+    f.triage_flags?.some((fl) => fl.kind === "soft_focus"),
+  );
+  const heroPicks = manifest.triage?.hero_picks ?? [];
   const elapsedStr = elapsed(manifest.started_at, manifest.finished_at);
 
   let verifyExplanation = "";
@@ -211,7 +215,7 @@ ${t.xmp_written_count > 0 ? `    <dt>Photo info added:</dt><dd>${t.xmp_written_c
     <dt>Photo info skipped:</dt><dd>${t.xmp_failed_count} photos</dd>`
       : ""
   }
-${t.triage_unreadable_count > 0 || t.triage_black_frame_count > 0 ? `    <dt>Triage:</dt><dd>${t.triage_unreadable_count} unreadable, ${t.triage_black_frame_count} possible junk frames</dd>` : ""}
+${t.triage_unreadable_count > 0 || t.triage_black_frame_count > 0 || t.triage_soft_focus_count > 0 ? `    <dt>Triage:</dt><dd>${t.triage_unreadable_count} unreadable, ${t.triage_black_frame_count} possible junk frames, ${t.triage_soft_focus_count} soft focus</dd>` : ""}
     <dt>Hash algorithm:</dt><dd>${escapeHtml(manifest.hash_algo)}</dd>
     <dt>Verify mode:</dt><dd>${escapeHtml(manifest.verify_mode)}</dd>
     <dt>Elapsed:</dt><dd>${elapsedStr}</dd>
@@ -258,6 +262,33 @@ ${triageBlackFrames
   .map((f) => {
     const flag = f.triage_flags!.find((fl) => fl.kind === "black_frame")!;
     return `<tr><td class="mono">${escapeHtml(f.src_rel)}</td><td>${escapeHtml(flag.reason)}</td><td>${flag.metric ?? "-"}/255</td></tr>`;
+  })
+  .join("\n")}
+</table>`
+    : ""
+}
+
+${
+  heroPicks.length > 0
+    ? `<h2>Sharpest Shots (${heroPicks.length})</h2>
+<table>
+<tr><th>File</th><th>Sharpness Score</th></tr>
+${heroPicks
+  .map((p) => `<tr><td class="mono">${escapeHtml(p.file)}</td><td>${p.score}/100</td></tr>`)
+  .join("\n")}
+</table>`
+    : ""
+}
+
+${
+  triageSoftFocus.length > 0
+    ? `<h2>Soft Focus (${triageSoftFocus.length})</h2>
+<table>
+<tr><th>File</th><th>Reason</th><th>Sharpness</th><th>Confidence</th></tr>
+${triageSoftFocus
+  .map((f) => {
+    const flag = f.triage_flags!.find((fl) => fl.kind === "soft_focus")!;
+    return `<tr><td class="mono">${escapeHtml(f.src_rel)}</td><td>${escapeHtml(flag.reason)}</td><td>${flag.metric ?? "-"}/100</td><td>${Math.round(flag.confidence * 100)}%</td></tr>`;
   })
   .join("\n")}
 </table>`

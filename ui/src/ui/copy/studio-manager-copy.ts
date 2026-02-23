@@ -78,7 +78,10 @@ export const COPY = {
   triageBlackFrames: (n: number) => `${n} possible junk frame${n === 1 ? "" : "s"}`,
   triageShowUnreadable: "Show unreadable files",
   triageShowJunk: "Show junk candidates",
+  triageSoftFocus: (n: number) => `${n} ${n === 1 ? "photo" : "photos"} with possible soft focus`,
   triageClean: "All files look good",
+  heroPicksTitle: "Sharpest shots",
+  heroPicksDescription: "These stood out for sharpness.",
 
   // Completion
   startEditing: "Start Editing",

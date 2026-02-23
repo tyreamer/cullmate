@@ -42,6 +42,8 @@ export type FileEntry = {
   backup_hash_dest?: string; // hex digest from backup verification pass
   backup_verified?: boolean;
   backup_error?: string;
+  // Sharpness score (0-100, populated by triage pass)
+  sharpness_score?: number;
   // Triage flags (populated by triage pass)
   triage_flags?: TriageFlag[];
 };
@@ -84,6 +86,7 @@ export type IngestManifest = {
     xmp_failed_count: number;
     triage_unreadable_count: number;
     triage_black_frame_count: number;
+    triage_soft_focus_count: number;
   };
   files: FileEntry[];
 };
@@ -144,6 +147,7 @@ export type IngestProgressEvent =
       type: "ingest.triage.done";
       unreadable_count: number;
       black_frame_count: number;
+      soft_focus_count: number;
       elapsed_ms: number;
     }
   | {

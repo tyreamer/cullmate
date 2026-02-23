@@ -49,7 +49,9 @@ export type ResultCard = {
   triageSummary?: {
     unreadableCount: number;
     blackFrameCount: number;
+    softFocusCount: number;
   };
+  heroPicks?: Array<{ file: string; score: number }>;
   burstSummary?: {
     burstCount: number;
     bestPickCount: number;

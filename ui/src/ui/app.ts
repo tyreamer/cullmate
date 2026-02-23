@@ -1779,8 +1779,10 @@ export class OpenClawApp extends LitElement {
             ? {
                 unreadableCount: result.triage.unreadable_count,
                 blackFrameCount: result.triage.black_frame_count,
+                softFocusCount: result.triage.soft_focus_count ?? 0,
               }
             : undefined,
+          heroPicks: result.triage?.hero_picks ?? [],
           burstSummary: result.bursts
             ? {
                 burstCount: result.bursts.burst_count,
@@ -1979,8 +1981,10 @@ export class OpenClawApp extends LitElement {
             ? {
                 unreadableCount: result.triage.unreadable_count,
                 blackFrameCount: result.triage.black_frame_count,
+                softFocusCount: result.triage.soft_focus_count ?? 0,
               }
             : undefined,
+          heroPicks: result.triage?.hero_picks ?? [],
           burstSummary: result.bursts
             ? {
                 burstCount: result.bursts.burst_count,
